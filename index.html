@@ -26,7 +26,8 @@
   section.card h2{margin:0 0 10px;font-size:17px;color:var(--navy)}
   .hidden{display:none}
   textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:6px;padding:10px}
-  #src{min-height:260px}
+  #src{min-height:260px;font-size:15px;font-weight:600;color:var(--text);line-height:1.6}
+  #src::placeholder{font-weight:400;color:var(--muted)}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
   button{font:inherit;font-size:14px;border:1px solid var(--navy);background:#fff;color:var(--navy);padding:7px 14px;border-radius:6px;cursor:pointer}
   button.primary{background:var(--navy);color:#fff}
@@ -37,7 +38,7 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 18px;margin-top:8px}
   label{font-size:14px}
   .note{font-size:13px;color:var(--muted)}
-  pre.masked{white-space:pre-wrap;background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:12px;max-height:340px;overflow:auto;font-family:inherit;font-size:14px}
+  pre.masked{white-space:pre-wrap;background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:12px;max-height:340px;overflow:auto;font-family:inherit;font-size:15px;font-weight:600;color:var(--text);line-height:1.6}
   mark{background:#ffe7a3;padding:0 2px;border-radius:3px}
   table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
   th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
@@ -98,7 +99,7 @@
   <!-- ① 붙여넣기 -->
   <section class="card" id="c1">
     <h2>① 기안문 본문 붙여넣기</h2>
-    <p class="note">그룹웨어 기안문 본문을 복사해 붙여넣으세요. 표가 한 칸씩 줄바꿈으로 풀려도 괜찮습니다. 결재선·기안자 정보는 빼고 본문만 복사하는 것을 권장합니다.</p>
+    <p class="note" style="font-size:15px;font-weight:700;color:var(--text)">그룹웨어 기안문 본문을 복사해 붙여넣으세요. 표가 한 칸씩 줄바꿈으로 풀려도 괜찮습니다.<br>결재선·기안자 정보는 빼고 본문만 복사하는 것을 권장합니다.</p>
     <textarea id="src" placeholder="여기에 기안문 본문을 붙여넣으세요" autocomplete="off"></textarea>
     <details>
       <summary>마스킹·점검 설정</summary>
