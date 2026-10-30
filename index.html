@@ -1051,6 +1051,21 @@ function extract(masked){
 
   const bi = parseBudgetItems(L);
   out.budget = bi.sum; out.budgetLines = bi.lines; out.reqTotal = bi.reqTotal;
+  // 예산항목 표에 '(단위: 천원)' 표기가 없거나 복사 중 빠져도, 본건 청구액 × 1,000(또는 10,000)이 소요예산과
+  // 정확히 같으면 그 단위로 보고 표 전체를 원 단위로 환산
+  {
+    const req = money(out.budget[3] || out.reqTotal), tot = money(out.total || out.sum);
+    if (req !== '' && tot !== '' && req > 0 && req !== tot){
+      const unit = [1000, 10000].find(u => req * u === tot);
+      if (unit){
+        const conv = v => v === '' || v == null ? v : fmt(money(v) * unit);
+        out.budget = out.budget.map(conv);
+        out.budgetLines = (out.budgetLines || []).map(ln => ({...ln, nums:ln.nums.map(conv)}));
+        if (out.reqTotal) out.reqTotal = conv(out.reqTotal);
+        out.budgetUnitGuess = unit;
+      }
+    }
+  }
   out.workParts = parseWorkParts(L);
 
   out.attach = parseAttachments(L);
@@ -1284,6 +1299,8 @@ function runChecks(f){
       if (!isNaN(u) && !isNaN(q) && !isNaN(a) && u * q !== a) add('err', `${r.content} 산출`, `${won(u)} × ${q} = ${won(u * q)}인데 금액은 ${won(a)}입니다`);
     }
   });
+  if (f.budgetUnitGuess)
+    add('info', '예산항목 단위', `예산항목 금액이 소요예산의 1/${f.budgetUnitGuess.toLocaleString()}이라 ${f.budgetUnitGuess === 1000 ? '천원' : '만원'} 단위로 보고 원 단위로 환산했습니다. 표에 '(단위: ${f.budgetUnitGuess === 1000 ? '천원' : '만원'})'을 적어 두세요`);
   const b = f.budget.map(num);
   if (isNaN(b[1]) && !isNaN(b[0]) && b[0] === b[2]) b[1] = 0;   // 기 청구액 '-' = 0원
   if (!isNaN(b[0]) && isNaN(b[3]))
@@ -2107,7 +2124,7 @@ function readForm(){
           budgetLines:extracted ? extracted.budgetLines : [], reqTotal:extracted ? extracted.reqTotal : '',
           quotes:extracted ? extracted.quotes : [], items:extracted ? extracted.items : [], buyVendor:extracted ? extracted.buyVendor : '',
           workParts:extracted ? extracted.workParts : null, evals:extracted ? extracted.evals : null,
-          attendees:extracted ? extracted.attendees : 0};
+          attendees:extracted ? extracted.attendees : 0, budgetUnitGuess:extracted ? extracted.budgetUnitGuess : 0};
 }
 
 const LV = {err:['🔴 확인 필요','err'], warn:['🟡 보완','warn'], ok:['🟢 적합','ok'], info:['ℹ️ 안내','info']};
