@@ -1,0 +1,1950 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기안문 사전점검</title>
+<style>
+  :root{
+    --navy:#002D56; --gold:#8D7150; --green:#146E7A;
+    --bg:#F4F6F9; --card:#fff; --line:#D9DEE5; --text:#1d2430; --muted:#5d6878;
+    --ok:#1e7d4f; --okbg:#e6f4ec; --warn:#a46a00; --warnbg:#fff4dc;
+    --err:#b3261e; --errbg:#fdeceb; --info:#2a5d8f; --infobg:#e8f0f8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;font-size:15px;line-height:1.55}
+  header{background:#fff;border-bottom:3px solid var(--navy);padding:14px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{margin:0;font-size:20px;color:var(--navy)}
+  header .sub{color:var(--muted);font-size:13px}
+  .badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:var(--infobg);color:var(--info);border:1px solid #c5d6e8}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+  .steps{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .steps div{flex:1;min-width:150px;padding:8px 12px;border-radius:6px;background:#e3e8ef;color:var(--muted);font-weight:bold;font-size:14px}
+  .steps div.on{background:var(--navy);color:#fff}
+  .steps div.done{background:#c9d6e6;color:var(--navy)}
+  section.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin-bottom:18px}
+  section.card h2{margin:0 0 10px;font-size:17px;color:var(--navy)}
+  .hidden{display:none}
+  textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:6px;padding:10px}
+  #src{min-height:260px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  button{font:inherit;font-size:14px;border:1px solid var(--navy);background:#fff;color:var(--navy);padding:7px 14px;border-radius:6px;cursor:pointer}
+  button.primary{background:var(--navy);color:#fff}
+  button.small{padding:3px 8px;font-size:12px}
+  button:hover{opacity:.88}
+  details{margin-top:12px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:#fafbfc}
+  details summary{cursor:pointer;font-weight:bold;color:var(--navy)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 18px;margin-top:8px}
+  label{font-size:14px}
+  .note{font-size:13px;color:var(--muted)}
+  pre.masked{white-space:pre-wrap;background:#fafbfc;border:1px solid var(--line);border-radius:6px;padding:12px;max-height:340px;overflow:auto;font-family:inherit;font-size:14px}
+  mark{background:#ffe7a3;padding:0 2px;border-radius:3px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:#eef2f7;color:var(--navy);white-space:nowrap}
+  td input,td select{width:100%;font:inherit;font-size:13px;padding:3px 5px;border:1px solid var(--line);border-radius:4px}
+  .form input[type=text],.form input[type=number]{width:100%;font:inherit;font-size:14px;padding:4px 6px;border:1px solid var(--line);border-radius:4px}
+  .lv{font-weight:bold;white-space:nowrap;border-radius:4px;padding:1px 6px;font-size:13px}
+  .lv.ok{color:var(--ok);background:var(--okbg)} .lv.warn{color:var(--warn);background:var(--warnbg)}
+  .lv.err{color:var(--err);background:var(--errbg)} .lv.info{color:var(--info);background:var(--infobg)}
+  .summary{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+  .summary span{padding:6px 12px;border-radius:6px;font-weight:bold}
+  td.basis{font-size:12.5px;color:var(--muted)}
+  .ai-panel{margin-top:12px;border:1px solid #c5d6e8;background:#f5f9fd;border-radius:6px;padding:10px 12px}
+  .ai-panel input[type=password]{font:inherit;font-size:14px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;width:100%;max-width:360px}
+  .src-ai{border-color:#6f9fd0 !important;background:#f1f7fd !important}
+  .src-conflict{border-color:#e0a030 !important;background:#fff6e2 !important}
+  label.src-conflict,label.src-ai{border-radius:4px;padding:2px 4px}
+  .legend span{display:inline-block;padding:1px 8px;border-radius:4px;margin-right:6px;font-size:12.5px;border:1px solid}
+  .status{margin-top:8px;font-size:14px;padding:8px 12px;border-radius:6px;display:none}
+  .status.run{display:block;background:var(--infobg);color:var(--info)}
+  .status.bad{display:block;background:var(--errbg);color:var(--err)}
+  .status.good{display:block;background:var(--okbg);color:var(--ok)}
+  dialog#aiConfirm{border:none;border-radius:10px;padding:22px 24px 18px;max-width:420px;width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.25);border-top:5px solid var(--gold)}
+  dialog#aiConfirm::backdrop{background:rgba(0,20,40,.45)}
+  dialog#aiConfirm p{margin:0 0 18px;font-size:15px;line-height:1.6}
+  dialog#aiConfirm .btns{display:flex;justify-content:flex-end;gap:8px}
+  header h1 a{color:inherit;text-decoration:none}
+  header h1 a:hover{text-decoration:underline;text-underline-offset:4px}
+  #toTop{position:fixed;right:22px;bottom:22px;width:46px;height:46px;border-radius:50%;border:none;background:var(--navy);color:#fff;
+    font-size:22px;line-height:46px;padding:0;box-shadow:0 3px 10px rgba(0,0,0,.25);cursor:pointer;opacity:0;visibility:hidden;transition:opacity .2s}
+  #toTop.show{opacity:.92;visibility:visible}
+  #toTop:hover{background:var(--gold)}
+  .notice{background:#f7f2ea;border:1px solid #d9c9b0;border-left:6px solid var(--gold);border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#4a3b28;font-size:14px}
+  .notice b{color:var(--gold)}
+  .excl{font-size:13px;color:var(--muted);margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  @media (max-width:640px){ th,td{font-size:12.5px} header{padding:12px 16px} }
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="#" id="homeLink" title="처음 화면으로">기안문 사전점검</a></h1>
+  <span class="sub">대학혁신지원사업 사업비 시행기안 · 결재 전 기준 점검</span>
+  <span class="badge" id="sendBadge">시제품 · 모든 처리는 이 브라우저 안에서만 (외부 전송 없음)</span>
+</header>
+<main>
+  <div class="notice"><b>안내</b>&nbsp; 이 기안문 사전점검봇은 대학혁신지원사업 사업비 활용을 위한 시행기안(원안기안) 시 예산 사용, 산출근거 등의 보완점을 사전 검토하는 용도로 만들어졌습니다. 일부 내용은 정확하지 않을 수 있으며, 반드시 기안자가 최종 확인 후 진행하여 주시기 바랍니다.</div>
+  <div class="steps">
+    <div id="st1" class="on">① 기안문 붙여넣기</div>
+    <div id="st2">② 개인정보 마스킹</div>
+    <div id="st3">③ 추출 항목 확인</div>
+    <div id="st4">④ 점검 결과</div>
+  </div>
+
+  <!-- ① 붙여넣기 -->
+  <section class="card" id="c1">
+    <h2>① 기안문 본문 붙여넣기</h2>
+    <p class="note">그룹웨어 기안문 본문을 복사해 붙여넣으세요. 표가 한 칸씩 줄바꿈으로 풀려도 괜찮습니다. 결재선·기안자 정보는 빼고 본문만 복사하는 것을 권장합니다.</p>
+    <textarea id="src" placeholder="여기에 기안문 본문을 붙여넣으세요" autocomplete="off"></textarea>
+    <details>
+      <summary>마스킹·점검 설정</summary>
+      <div class="grid">
+        <label><input type="checkbox" id="optName" checked> 실명 마스킹</label>
+        <label>실명 처리 방식
+          <select id="optNameMode">
+            <option value="token">기호로 바꾸고 직위 유지 ([A] 총장)</option>
+            <option value="circle">성만 남김 (홍○○ 총장)</option>
+            <option value="delete">이름 삭제 ([이름] 총장)</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="optPhone" checked> 전화·휴대폰 번호 마스킹</label>
+        <label><input type="checkbox" id="optEmail" checked> 이메일 마스킹</label>
+        <label><input type="checkbox" id="optSign" checked> 결재선·기안자 줄 삭제</label>
+        <label><input type="checkbox" checked disabled> 주민·외국인등록번호, 계좌번호, 첨부파일 비밀번호 삭제 (항상)</label>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <label>예외 사전 (마스킹하지 않을 단어, 줄마다 하나)
+          <textarea id="optExcept" rows="4">이덕선 회의실
+한예종
+대학별
+우리대학</textarea>
+        </label>
+        <div>
+          <label>사업기간 시작 <input type="date" id="optFrom" value="2026-03-01"></label><br>
+          <label>사업기간 종료 <input type="date" id="optTo" value="2027-02-28"></label>
+          <p class="note">계약기간·행사일이 사업기간 안인지 점검할 때 씁니다(지침 15쪽).</p>
+        </div>
+      </div>
+    </details>
+    <div class="ai-panel hidden" id="aiPanel">
+      <label><input type="checkbox" id="aiOn"> <b>AI 추출 함께 사용</b> (규칙 추출 + Claude가 다시 읽어 빈칸 채우기)</label>
+      <div class="grid" id="aiOpts" style="display:none">
+        <label>모델
+          <select id="aiModel">
+            <option value="claude-opus-5-5">Claude Opus 5.5 (기본·정확도 우선)</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5 (저비용)</option>
+            <option value="HCX-007">HyperCLOVA X HCX-007 (네이버클라우드 · 실행기 필요)</option>
+          </select>
+        </label>
+        <label><span id="aiKeyLabel">Anthropic API 키</span> <input type="password" id="aiKey" placeholder="sk-ant-..." autocomplete="off"></label>
+        <label><input type="checkbox" id="aiRemember"> 이 브라우저에 키 저장</label>
+      </div>
+      <p class="note" style="margin:6px 0 0">AI를 켜면 ②의 <b>마스킹된 본문만</b> 선택한 AI 서비스(Anthropic 또는 네이버클라우드 CLOVA Studio)로 전송됩니다. 원문과 가려진 이름은 보내지 않습니다. 키는 저장을 선택하지 않으면 창을 닫을 때 사라집니다.</p>
+      <p class="note" id="clovaHint" style="margin:6px 0 0;display:none">HyperCLOVA X는 브라우저에서 바로 호출할 수 없어(네이버클라우드 보안 정책), 같은 폴더의 <b>「실행(HyperCLOVA X 사용 시).bat」</b>을 더블클릭해 열린 화면에서 사용하세요. 키는 CLOVA Studio에서 발급한 API 키(nv-…)를 넣습니다.</p>
+    </div>
+    <div class="row">
+      <button id="btnSample">예시 기안문 불러오기</button>
+      <button id="btnMask">단계별로: 개인정보 마스킹 →</button>
+      <button class="primary" id="btnQuick">빠른 점검 (마스킹→추출→점검 한 번에)</button>
+      <button id="btnAi" style="margin-left:auto;border-color:var(--gold);color:var(--gold)">AI 추출 사용</button>
+    </div>
+    <div class="status" id="quickStatus"></div>
+  </section>
+
+  <!-- ② 마스킹 -->
+  <section class="card hidden" id="c2">
+    <h2>② 개인정보 마스킹 결과</h2>
+    <p class="note">점검(향후 AI 추출 포함)에는 아래 마스킹된 본문만 씁니다. 잘못 가려진 단어는 [예외로 두기]를 누르세요.</p>
+    <div id="maskList"></div>
+    <pre class="masked" id="maskedView"></pre>
+    <div class="row">
+      <button id="btnBack1">← 다시 붙여넣기</button>
+      <button class="primary" id="btnExtract">다음: 항목 추출 →</button>
+    </div>
+  </section>
+
+  <!-- ③ 추출 확인 -->
+  <section class="card hidden form" id="c3">
+    <h2>③ 추출 항목 확인 <span class="badge" id="engineBadge">추출 엔진: 규칙 기반</span></h2>
+    <p class="note">기안문에서 이렇게 읽었습니다. 잘못 읽은 값은 직접 고친 뒤 [점검 실행]을 누르세요. 판정은 아래 값으로만 계산합니다.</p>
+    <p class="note legend" id="legend" style="display:none"><span style="border-color:#6f9fd0;background:#f1f7fd">AI가 채움</span><span style="border-color:#e0a030;background:#fff6e2">규칙과 AI가 다르게 읽음 (마우스를 올리면 규칙 값 표시)</span></p>
+    <div class="status" id="aiStatus"></div>
+    <div class="grid">
+      <label>행사·사업명 <input type="text" id="fName"></label>
+      <label>행사일 (YYYY-MM-DD) <input type="text" id="fDate"></label>
+      <label>기안문에 적힌 요일 <input type="text" id="fDow"></label>
+      <label>참석 명단 인원(이름이 적힌 인원) <input type="number" id="fNamed"></label>
+      <label><input type="checkbox" id="fExtra"> 명단에 '관계자' 등 인원 미기재 표현 있음</label>
+      <label><input type="checkbox" id="fMeal"> 식순(일정)에 식사 일정 있음</label>
+      <label><input type="checkbox" id="fVat" checked> 예산 금액은 부가세 포함</label>
+    </div>
+    <h3 style="font-size:15px;color:var(--navy);margin:16px 0 0">예산내역 <span class="note" id="rowsInfo" style="font-weight:normal"></span></h3>
+    <table id="tblRows">
+      <thead><tr><th>내용</th><th style="width:120px">유형</th><th>산출근거</th><th style="width:95px">단가</th><th style="width:70px">인원·수량</th><th style="width:110px">금액</th><th style="width:150px">강사 유형·시간<br><span style="font-weight:normal;font-size:11px">(강사료만)</span></th><th style="width:44px"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row"><button class="small" id="btnAddRow">+ 행 추가</button></div>
+    <div class="grid" style="margin-top:12px">
+      <label>예산내역 합계 <input type="text" id="fSum"></label>
+      <label>소요예산(숫자) <input type="text" id="fTotal"></label>
+      <label>소요예산(한글 금액) <input type="text" id="fTotalKo"></label>
+    </div>
+    <h3 style="font-size:15px;color:var(--navy);margin:16px 0 0">예산항목(잔액) <span class="note" id="budgetInfo" style="font-weight:normal"></span></h3>
+    <div class="grid">
+      <label>배정액 <input type="text" id="fB1"></label>
+      <label>기 청구액 <input type="text" id="fB2"></label>
+      <label>청구 전 잔액 <input type="text" id="fB3"></label>
+      <label>본건 청구액 <input type="text" id="fB4"></label>
+      <label>청구 후 잔액 <input type="text" id="fB5"></label>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <label>붙임(첨부) 목록 — 쉼표로 구분 <span class="note" id="attachInfo"></span> <input type="text" id="fAttach"></label>
+    </div>
+    <div class="row">
+      <button id="btnBack2">← 마스킹 결과</button>
+      <button class="primary" id="btnCheck">점검 실행 →</button>
+    </div>
+  </section>
+
+  <!-- ④ 결과 -->
+  <section class="card hidden" id="c4">
+    <h2>④ 점검 결과</h2>
+    <div class="summary" id="sumBox"></div>
+    <table id="tblResult">
+      <thead><tr><th style="width:90px">판정</th><th style="width:150px">항목</th><th>내용</th><th style="width:240px">근거</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row">
+      <button id="btnBack3">← 추출 항목 수정</button>
+      <button class="primary" id="btnCopy">보완 안내문 복사</button>
+      <span class="note" id="copyMsg"></span>
+      <button id="btnHome" style="margin-left:auto">초기 화면으로 돌아가기</button>
+    </div>
+    <div class="excl">
+      <b>검증하지 않는 항목</b> · 예산 사업명과 실행과제 명칭 일치(학교 예산 특성상 제외) · 예산 계정목(예산팀 대외비 기준) · 첨부파일 내용(볼 수 없으므로 '첨부 확인' 안내만 표시)<br>
+      <b>보류</b> · 사업비 구성항목의 비목 적합성(참고자료 확보 후 추가) · 기념품 1인당 한도(예산조정팀으로 문의)
+    </div>
+  </section>
+</main>
+
+<button id="toTop" title="맨 위로" aria-label="맨 위로">↑</button>
+
+<dialog id="aiConfirm">
+  <p>개인 API 키를 입력해야 사용 가능하며, 토큰 사용이 발생합니다. 사용하시겠습니까?</p>
+  <div class="btns">
+    <button id="aiCancel">취소</button>
+    <button class="primary" id="aiAccept">사용</button>
+  </div>
+</dialog>
+
+<script id="core">
+/* ───────── 기준 ───────── */
+const G = '2026 한국외대 대학혁신지원사업 사업비 집행지침 ';
+const R = '한국외대 구매규정 ';
+const MEAL = {snack:10000, meal:25000, both:30000};   // 지침 38쪽
+// 2026학년도 교외 전문가 특별강의료 지급 기준 (지침 35쪽, 각종 세금 포함)
+const LECT = {
+  S:{label:'특별(최고권위자)', once:1000000},
+  1:{label:'Ⅰ유형', first:800000, extra:600000},
+  2:{label:'Ⅱ유형', first:500000, extra:300000},
+  3:{label:'Ⅲ유형', first:300000, extra:200000},
+  4:{label:'Ⅳ유형', first:200000, extra:150000},
+  F1:{label:'국외Ⅰ', usd:1500}, F2:{label:'국외Ⅱ', usd:1000}, F3:{label:'국외Ⅲ', usd:700}
+};
+function lectLimit(g, h){
+  const L = LECT[g]; if (!L || L.usd) return NaN;
+  if (L.once) return L.once;
+  return L.first + Math.max(0, Math.ceil(h || 1) - 1) * L.extra;
+}
+const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유홍전고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부가복태목형피두감음빈동온호범좌팽승간상갈시견당';
+const STOP = ['우리대학','한예종','대학별','관계자','참석자','담당자','협약','행사','기념','외부','내부','전체','각','본교'];
+const TITLE = '[가-힣]*(?:부총장|총장|처장|원장|센터장|팀장|교수|과장|학장|부장|실장|위원장|위원|단장|소장|국장|차장|대표|이사장|이사|주임|연구원|강사|조교|주무관|사무관)';
+
+/* ───────── 유틸 ───────── */
+const num = s => { if (s == null) return NaN; const t = String(s).replace(/[^\d.-]/g, ''); return t === '' ? NaN : Number(t); };
+const won = n => isNaN(n) ? '-' : Math.round(n).toLocaleString('ko-KR') + '원';
+const DOW = '일월화수목금토';
+
+function parseKoreanAmount(s){
+  if (!s) return NaN;
+  s = s.replace(/[금원정整\s()]/g, '');
+  const D = {'영':0,'일':1,'이':2,'삼':3,'사':4,'오':5,'육':6,'칠':7,'팔':8,'구':9};
+  const S = {'십':10,'백':100,'천':1000}, B = {'만':1e4,'억':1e8,'조':1e12};
+  let total = 0, sec = 0, n = 0;
+  for (const ch of s){
+    if (ch in D) n = D[ch];
+    else if (ch in S){ sec += (n || 1) * S[ch]; n = 0; }
+    else if (ch in B){ sec += n; total += (sec || 1) * B[ch]; sec = 0; n = 0; }
+    else return NaN;
+  }
+  return total + sec + n;
+}
+
+/* ───────── 마스킹 ───────── */
+function maskText(text, opt){
+  const found = [];
+  const ex = (opt.exceptions || []).filter(Boolean);
+  // 예외 단어는 자리표시자로 보호
+  let t = text;
+  ex.forEach((w, i) => { t = t.split(w).join('\u0001' + i + '\u0001'); });
+
+  if (opt.sign){
+    t = t.split('\n').filter(l => {
+      if (/^\s*(기안자|검토자|협조자|결재권자|전결|결재|담당자|기안)\s*[:：]?/.test(l)){ found.push({type:'결재선', orig:l.trim(), repl:'(줄 삭제)'}); return false; }
+      return true;
+    }).join('\n');
+  }
+  // 첨부파일 비밀번호 (항상 삭제): '(비번: 2448)', '비밀번호 1234' 등
+  t = t.replace(/(?:비\s*번|비밀\s*번호|암\s*호|password|PW)\s*[:：]\s*[^\s,)]{3,}|(?:비\s*번|비밀\s*번호)\s+[A-Za-z0-9!@#$%^&*._-]{3,}/gi,
+    m => { found.push({type:'비밀번호', orig:m, repl:'[비밀번호 삭제]'}); return '[비밀번호 삭제]'; });
+  // 주민·외국인등록번호 (항상 삭제)
+  t = t.replace(/\b\d{6}\s*-\s*[1-8]\d{6}\b/g, m => { found.push({type:'주민·외국인등록번호', orig:m, repl:'[삭제]'}); return '[주민번호 삭제]'; });
+  // 계좌번호 (은행명 + 숫자열, 항상 삭제)
+  t = t.replace(/(국민|신한|우리|하나|농협|NH|기업|IBK|SC제일|씨티|카카오뱅크|카카오|토스뱅크|케이뱅크|우체국|새마을금고|수협|부산|대구|경남|광주|전북|제주)(은행)?\s*[:：]?\s*(\d[\d-]{7,}\d)/g,
+    (m, b, e, n) => { found.push({type:'계좌번호', orig:m, repl:'[삭제]'}); return b + (e||'') + ' [계좌번호 삭제]'; });
+  if (opt.phone){
+    t = t.replace(/\b(01[016789]|0\d{1,2})[-.\s]?(\d{3,4})[-.\s]?(\d{4})\b/g, (m, a, b, c) => { const r = a + '-****-' + c; found.push({type:'전화번호', orig:m, repl:r}); return r; });
+  }
+  if (opt.email){
+    t = t.replace(/([A-Za-z0-9._%+-]{1,})@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g, (m, u, d) => { const r = u.slice(0,2) + '***@' + d; found.push({type:'이메일', orig:m, repl:r}); return r; });
+  }
+  if (opt.name){
+    const re = new RegExp('(?<=^|[\\s,:;·(\\[])([가-힣]{2,4})(?=\\s+(?:[가-힣A-Za-z0-9]+\\s+){0,2}' + TITLE + '(?![가-힣]))', 'gm');
+    const map = new Map();
+    t = t.replace(re, (m) => {
+      if (!SURNAMES.includes(m[0]) || STOP.includes(m)) return m;
+      if (!map.has(m)){
+        const k = map.size;
+        const token = opt.nameMode === 'circle' ? m[0] + '○'.repeat(m.length - 1)
+                    : opt.nameMode === 'delete' ? '[이름]'
+                    : '[' + (k < 26 ? String.fromCharCode(65 + k) : 'P' + k) + ']';
+        map.set(m, token);
+        found.push({type:'실명', orig:m, repl:token});
+      }
+      return map.get(m);
+    });
+    // 직위가 이름 앞에 오는 경우: '(대표이사 홍길동)', '담당자 홍길동'
+    const NOUN = ['사업','이사','기관','업체','회사','번호','전화','메일','명의','변경','선임','추천','승인','확인','서명','직인'];
+    t = t.replace(/(대표\s*이사|대표자|담당자)\s+([가-힣]{2,4})(?=[\s,)\]]|$)/gm, (all, title, nm) => {
+      if (!SURNAMES.includes(nm[0]) || NOUN.includes(nm) || STOP.includes(nm)) return all;
+      if (/[은는이가을를의에과와도로회]$/.test(nm) && nm.length >= 3 && NOUN.some(w => nm.startsWith(w))) return all;   // '사업은' 같은 말 제외
+      if (!map.has(nm)){
+        const k = map.size;
+        const token = opt.nameMode === 'circle' ? nm[0] + '○'.repeat(nm.length - 1)
+                    : opt.nameMode === 'delete' ? '[이름]'
+                    : '[' + (k < 26 ? String.fromCharCode(65 + k) : 'P' + k) + ']';
+        map.set(nm, token);
+        found.push({type:'실명', orig:nm, repl:token});
+      }
+      return `${title} ${map.get(nm)}`;
+    });
+  }
+  ex.forEach((w, i) => { t = t.split('\u0001' + i + '\u0001').join(w); });
+  return {text:t, found};
+}
+
+/* ───────── 추출 (규칙 기반, AI 대체 지점) ───────── */
+function linesOf(t){ return t.split(/\r?\n/).map(s => s.trim()).filter(Boolean); }
+function section(lines, startRe, endRe){
+  const i = lines.findIndex(l => startRe.test(l));
+  if (i < 0) return [];
+  let j = lines.findIndex((l, k) => k > i && endRe.test(l));
+  if (j < 0) j = lines.length;
+  return lines.slice(i, j);
+}
+function classify(s){
+  if (/장학금|장학생/.test(s)) return 'scholarship';
+  if (/상품권|기프티콘|모바일\s*쿠폰|쿠폰|유가증권|전자상품권/.test(s)) return 'voucher';
+  if (/운영비|진행비|제반\s*경비/.test(s)) return 'bundle';
+  if (/기념품|답례품|홍보물품|경품/.test(s)) return 'gift';
+  if (/식대|식사|다과|간식|도시락|오찬|만찬/.test(s)) return 'meal';
+  if (/자문료|멘토링|멘토비|멘토\s*수당|전문가\s*(활용|자문)|컨설팅비/.test(s)) return 'advice';   // 외부 전문가 활용비(지침 34쪽)
+  if (/동영상|콘텐츠|이용\s*기간|이용권|라이선스|라이센스|구독/.test(s)) return 'service';   // 동영상 강의 임대 등은 특강료가 아님
+  if (/강사료|특강비|특강료|강연료|강의료|원고료/.test(s)) return 'lecture';
+  if (/설계\s*용역|감리/.test(s)) return 'service';
+  if (/공사(?!비)|시공|리모델링|개보수|증축|철거|도장|방수/.test(s)) return 'construction';
+  if (/용역|대행|임차|대관/.test(s)) return 'service';
+  if (/상금|시상금|포상금/.test(s)) return 'prize';                                        // 대회·공모전 상금(지침 37쪽 한도)
+  if (/활동\s*지원(비|금)|운영\s*지원금/.test(s)) return 'bundle';                          // 학생 활동 지원비(지침 36쪽): 여러 경비 묶음
+  if (/지급비|연구비|활동비|수당|사례비|장려금|참가비\s*지원/.test(s)) return 'payment';   // 개인에게 주는 돈
+  return 'goods';
+}
+const TYPE_LABEL = {meal:'식대·다과', gift:'기념품', voucher:'유가증권', bundle:'운영비(묶음)', lecture:'강사료·특강료', advice:'자문료·멘토링', payment:'지급비·연구비·활동비', prize:'상금', scholarship:'장학금', service:'용역', construction:'공사', goods:'물품'};
+function parseGrade(s){
+  const roman = {'Ⅰ':1,'Ⅱ':2,'Ⅲ':3,'Ⅳ':4,'I':1,'II':2,'III':3,'IV':4,'1':1,'2':2,'3':3,'4':4};
+  let m = s.match(/국외\s*(Ⅰ|Ⅱ|Ⅲ|III|II|I|[123])/);
+  if (m) return 'F' + roman[m[1]];
+  if (/특별\s*유형|최고\s*권위/.test(s)) return 'S';
+  m = s.match(/(Ⅳ|Ⅲ|Ⅱ|Ⅰ|IV|III|II|I|[1-4])\s*(?:유형|등급|급)/);
+  return m ? String(roman[m[1]]) : '';
+}
+
+/* ───────── 예산내역·산출내역·세부내역 표 읽기 ───────── */
+const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|소요\s*예산|단가|수량|인원|횟수|비고|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|모델명\(규격\)|규격\(모델\))$/i;
+// '구  분', '계 약 자', '비  고'처럼 글자 사이에 띄어쓰기가 있어도 열 제목으로 인식
+const HEAD_RE = {test:s => HEAD_WORDS.test(String(s).replace(/\s+/g, ''))};
+const AMT_COL = /^(금액|예산액|소요\s*예산|계약\s*금액|공사비|용역비|설계비|계$|소계$|합계$)/;   // '단가 | 수량 | 계' 표의 '계' 열도 금액 열
+const CODE_RE = /^[A-Z]\d{2,}(-\d+)+$/;            // 사업코드 (예: A055-25-432599)
+const NO_DETAIL = '세부 산출내역 없음(소요예산 전체)';
+const PROJ_RE = /^\[[^\]]+\]\S*$/;                 // 예산 사업명 (예: [혁신]학습역량프로그램운영비)
+const TOTAL_RE = /^(합\s*계|총\s*계|계|총\s*액|신청\s*금액\s*합계)$/;
+const SUBTOTAL_RE = /^소\s*계$/;
+const SKIP_RE = /^(…+|\.{2,}|⋯+|-)$/;
+const AMT_RE = /^금?\s*-?[\d,]{3,}\s*원?$/;
+const NOTE_LIKE = /실비|정산|VAT|부가|포함|별도|예정|견적|추정|이내|기준|참고|※|면세|과세/;
+
+function money(s){ const n = num(String(s).replace(/^금/, '')); return isNaN(n) ? '' : n; }
+function fmt(n){ return n === '' || isNaN(n) ? '' : Number(n).toLocaleString('ko-KR'); }
+
+// 산출근거 문장에서 "단가 × 인원 × 횟수 = 금액" 식들을 찾음
+function parseExprs(s){
+  // '5만원권*5명', '6천원권*35명' → '50000원*5명', '6000원*35명'
+  s = String(s).replace(/(\d+(?:\.\d+)?)\s*만\s*원\s*권?/g, (m, n) => Math.round(Number(n) * 10000) + '원')
+               .replace(/(\d+(?:\.\d+)?)\s*천\s*원\s*권?/g, (m, n) => Math.round(Number(n) * 1000) + '원');
+  // '100,000*최대 20회'처럼 수량 앞에 '최대·최소·약'이 붙어도 읽음
+  s = s.replace(/([×*xX✕])\s*(?:최대|최소|약|총)\s*(?=\d)/g, '$1');
+  const out = [], re = /(\d[\d,]*)\s*원?\s*((?:[×*xX✕]\s*\d[\d,.]*\s*[가-힣]{0,2}\s*)+)(?:=\s*([\d,]+)\s*원?)?/g;
+  let m;
+  while ((m = re.exec(s))){
+    const factors = m[2].split(/[×*xX✕]/).map(t => t.trim()).filter(Boolean);
+    const nums = factors.map(t => num(t.replace(/[가-힣]+$/, '')));
+    if (nums.some(isNaN)) continue;
+    out.push({unit:num(m[1]), factors, nums, product:nums.reduce((a, b) => a * b, num(m[1])), stated:m[3] ? num(m[3]) : NaN});
+  }
+  return out;
+}
+
+function makeRow(content, basisCells, amount, note, mult){
+  content = String(content).replace(/^[가-하]\.\s*/, '');   // '가. 건축(인테리어)' → '건축(인테리어)'
+  const basis = basisCells.filter(Boolean).join(' ');
+  const ex = parseExprs(basis);
+  if (amount === '' && ex.length){
+    const vals = ex.map(e => isNaN(e.stated) ? e.product : e.stated);
+    amount = vals.reduce((a, b) => a + b, 0);
+  }
+  // 유형: 유가증권은 어디에 적혀도 우선, 그다음 '내용' 칸 기준, 세부 식이 여러 개면 묶음 경비
+  let type = classify(content + ' ' + basis);
+  if (type !== 'voucher'){
+    const byContent = classify(content);
+    type = byContent !== 'goods' ? byContent : ex.length >= 2 ? 'bundle' : type;
+  }
+  const hm = basis.match(/(\d+(?:\.\d+)?)\s*시간/);
+  const row = {content, type, basis:basis + (note ? ' (' + note + ')' : ''), unit:'', qty:'',
+               amount:fmt(amount === '' ? '' : amount * mult),
+               grade:type === 'lecture' ? parseGrade(content + ' ' + basis) : '', hours:hm ? hm[1] : ''};
+  if (ex.length === 1){
+    const e = ex[0], f0 = e.factors[0] || '';
+    if (/시간$/.test(f0)) row.hours = String(e.nums[0]);   // 시간당 단가 표기는 1회 총액으로 판정
+    else { row.unit = fmt(e.unit); row.qty = String(e.nums[0]); }
+  } else if (!ex.length){
+    const cm = basis.match(/(\d[\d,]*)\s*(명|인|매)(?![가-힣])/);   // ', 인쇄'의 '인'을 인원으로 읽지 않게
+    if (cm) row.qty = cm[1];
+  }
+  // 유가증권: '○명을 선정(추첨)하여'가 여러 번이면 합계를 인원수로
+  if (type === 'voucher' && !row.qty){
+    const sel = [...basis.matchAll(/(\d[\d,]*)\s*명을?\s*(선정|추첨|선발)/g)].reduce((s, m) => s + num(m[1]), 0);
+    if (sel) row.qty = String(sel);
+    else if (ex.length >= 2) row.qty = String(ex.reduce((s, e) => s + (e.nums[0] || 0), 0));   // 5만원권*5명 + … 의 인원 합
+  }
+  return row;
+}
+
+function parseBudgetTable(text){
+  const raw = text.split(/\r?\n/).map(s => s.replace(/\s+$/, ''));
+  const START = /(예산|산출|세부)\s*(산출\s*)?내역|예산\s*산출|소요\s*예산\s*내역/;
+  let s = raw.findIndex(l => START.test(l));
+  if (s >= 0 && !HEAD_RE.test(raw[s].trim())) s++;    // 제목 줄이면 다음 줄부터, 열 제목이면 그 줄부터
+  else if (s >= 0) while (s > 0 && raw[s - 1].trim() && HEAD_RE.test(raw[s - 1].trim())) s--;   // '세부 내역' 앞의 연번·사업 내용 열 제목까지 포함
+  if (s < 0){
+    // 표 제목이 없을 때 ①: 금액·산출근거 같은 열 제목 묶음(또는 탭 표 머리줄)을 찾음
+    const isHead = t => HEAD_RE.test(t.trim());
+    s = raw.findIndex((l, k) => {
+      const win = raw.slice(Math.max(0, k - 3), k + 4);
+      if (win.some(x => /업체|견적/.test(x))) return false;   // 비교견적 표(업체명·금액)는 예산 표가 아님
+      if (l.includes('\t')) return l.split('\t').filter(c => c.trim() && isHead(c)).length >= 2 && /금액|산출|세부|예산액|단가/.test(l);
+      return isHead(l) && /금액|산출|세부|예산액|단가/.test(l) && win.filter(x => x.trim() && isHead(x)).length >= 2;
+    });
+    if (s >= 0) while (s > 0 && raw[s - 1].trim() && HEAD_RE.test(raw[s - 1].trim())) s--;
+  }
+  let fallback = false;
+  if (s < 0){
+    // 표 제목이 없을 때 ②: '소요예산' 아래에서 금액이 있는 줄들만 읽음
+    const t = raw.findIndex(l => /소요\s*예산/.test(l));
+    if (t < 0) return {rows:[], sum:''};
+    s = t + 1; fallback = true;
+  }
+  const END = /예산\s*항목|사업비\s*구성|예산\s*전용|^\s*붙임|배정\s*(예산)?\s*액|배정\s*예산/;   // 예산항목 표(배정액·잔액)는 예산 행이 아님
+  let e = raw.findIndex((l, i) => i >= s && END.test(l) && !HEAD_RE.test(l.trim()));
+  if (e < 0) e = raw.length;
+  const ctx = raw.slice(Math.max(0, s - 3), e).join(' ');
+  const mult = /단위\s*[:：]?\s*천\s*원/.test(ctx) ? 1000 : /단위\s*[:：]?\s*만\s*원/.test(ctx) ? 10000 : 1;
+  const seg = raw.slice(s, e);
+
+  // 탭으로 나뉜 표(한글·엑셀 복사)
+  if (seg.some(l => l.includes('\t'))) return parseTsv(seg, mult);
+
+  // 열 제목 읽기
+  const tok = seg.map(l => l.trim());
+  let i = 0; while (i < tok.length && !tok[i]) i++;
+  const head = [];
+  while (i < tok.length && (HEAD_RE.test(tok[i]) || (!tok[i] && head.length))){ if (tok[i]) head.push(tok[i]); i++; }
+  const hasIdx = head.some(h => /^(연번|번호|순번|No)/i.test(h));
+  const hc = head.map(h => h.replace(/\s+/g, ''));
+  const hasAmt = hc.some(h => AMT_COL.test(h));
+  const amtPos = hc.findIndex(h => AMT_COL.test(h));
+  const trailCols = amtPos >= 0 ? hc.slice(amtPos + 1) : [];   // 금액 열 뒤의 열들(계약자·비고 등)
+  const hasNote = trailCols.some(h => /^비고/.test(h));
+
+  const rows = []; let sum = '';
+  const body = tok.slice(i);
+
+  if (hasIdx && hasAmt){
+    // 연번 1, 2, 3… 을 기준으로 행 재구성 (금액 열이 따로 있는 표)
+    let expect = 1, cur = null;
+    for (let k = 0; k < body.length; k++){
+      const t = body[k];
+      if (!t || SKIP_RE.test(t)) continue;
+      if (TOTAL_RE.test(t)){ const n = body.slice(k + 1).find(x => x && AMT_RE.test(x)); if (n) sum = fmt(money(n) * mult); break; }
+      if (t === String(expect)){ if (cur) rows.push(cur); cur = []; expect++; continue; }
+      if (cur && !SUBTOTAL_RE.test(t)) cur.push(t);
+    }
+    if (cur) rows.push(cur);
+    // 금액 열이 산출근거 열보다 앞에 있는 표(연번 | 내용 | 금액 | 산출근거): 한 행 안에 '금액 → 근거'가 여러 번 나올 수 있음
+    const basisPos = hc.findIndex(h => /^(산출|세부)/.test(h));
+    if (basisPos > amtPos){
+      return {rows:rows.filter(c => c.length).map(c => {
+        const parts = []; let p = null;
+        c.slice(1).forEach(x => {
+          if (AMT_RE.test(x) && money(x) >= 100){ p = {amount:money(x), basis:[]}; parts.push(p); }
+          else if (p) p.basis.push(x);
+        });
+        if (!parts.length) return makeRow(c[0] || '', c.slice(1), '', '', mult);
+        const total = parts.reduce((s, q) => s + q.amount, 0);
+        // 금액 묶음이 여럿이면 '[금액] 근거' 형태로 남겨 묶음별 산출식을 따로 검증
+        const basis = parts.length === 1 ? parts[0].basis : parts.map(q => `[${fmt(q.amount * mult)}원] ${q.basis.join(' ')}`).join(' / ');
+        return makeRow(c[0] || '', [].concat(basis), total, '', mult);
+      }), sum};
+    }
+    // '연번 | 내용 | 단가 | 회(팀)·수량 | 계'처럼 단가·수량 열이 따로 있으면 '단가원 × 수량'으로 산출근거를 만듦
+    const uPos = hc.findIndex(h => /^단가/.test(h)), qPos = hc.findIndex(h => /^(수량|인원|횟수|회수|회|팀|명)/.test(h));
+    const qUnit = qPos >= 0 ? ((hc[qPos].match(/\((.+)\)/) || [])[1] || hc[qPos].replace(/수량|인원/, '')) : '';
+    return {rows:rows.filter(c => c.length).map(c => {
+      if (uPos > 0 && qPos > 0 && c.length === hc.length - 1){
+        const u = c[uPos - 1], q = c[qPos - 1];
+        if (AMT_RE.test(u) && /^\d[\d,]*$/.test(q))
+          return makeRow(c[0] || '', [`${u.replace(/원$/, '')}원 × ${q}${qUnit}`], money(c[amtPos - 1]), c.slice(amtPos).join(' '), mult);
+      }
+      let j = -1;
+      for (let q = c.length - 1; q >= 1; q--) if (AMT_RE.test(c[q]) && money(c[q]) >= 100){ j = q; break; }
+      return makeRow(c[0] || '', j >= 0 ? c.slice(1, j) : c.slice(1), j >= 0 ? money(c[j]) : '', j >= 0 ? c.slice(j + 1).join(' ') : '', mult);
+    }), sum};
+  }
+
+  // 그 밖의 표: 금액(숫자만 있는 칸) 또는 "= 금액"이 나오면 한 행이 끝남
+  // (금액 열 없이 '세부 내역' 칸에 "항목명 / 식 또는 금액"이 번갈아 나오는 형식 포함)
+  let cur = [];
+  const nextTok = k => { let q = k + 1; while (q < body.length && !body[q]) q++; return body[q] || ''; };
+  for (let k = 0; k < body.length; k++){
+    const t = body[k];
+    if (!t || SKIP_RE.test(t)) continue;
+    if (!cur.length && /^\d{1,3}$/.test(t)) continue;                          // 연번
+    if (CODE_RE.test(t)) continue;                                              // 사업코드
+    if (!cur.length && PROJ_RE.test(t) && CODE_RE.test(nextTok(k))) continue;  // 사업코드 앞의 예산 사업명
+    if (fallback && /^([가-하]|\d{1,2})[.)]\s/.test(t) && !cur.length) continue;   // '가. 금액: …' 같은 목차 줄은 건너뜀(보조 규칙일 때만)
+    const inlineTotal = t.match(/^(합\s*계|총\s*계|계|총\s*액)\s*[:：]?\s*금?\s*([\d,]{3,})\s*원?$/);
+    if (inlineTotal){ sum = fmt(money(inlineTotal[2]) * mult); break; }
+    if (TOTAL_RE.test(t)){ const n = body.slice(k + 1).find(x => x && AMT_RE.test(x)); if (n) sum = fmt(money(n) * mult); break; }
+    if (SUBTOTAL_RE.test(t)){ const n = body.findIndex((x, q) => q > k && x && AMT_RE.test(x)); if (n > 0) k = n; cur = []; continue; }
+    const isAmt = AMT_RE.test(t) && money(t) >= 100;
+    const eqAmt = !hasAmt && /=\s*[\d,]+\s*원?\s*$/.test(t);
+    if (isAmt && cur.length && hc.some(h => /^단가/.test(h)) && AMT_RE.test(body[k + 1] || '') && money(body[k + 1]) >= money(t)){
+      // '수량 | 단가 | 금액' 표: 이어지는 두 숫자 중 앞은 단가, 뒤는 금액, 단가 앞의 작은 정수는 수량
+      const qty = /^\d{1,4}$/.test(cur[cur.length - 1]) ? cur.pop() : '';
+      const amt = money(body[++k]);
+      let note = '';
+      if (hasNote && k + 1 < body.length){
+        const nx = body[k + 1];
+        if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx))){ note = nx; k++; }
+      }
+      rows.push(makeRow(cur[0], [...cur.slice(1), qty ? `${fmt(money(t))}원 × ${qty}` : `단가 ${fmt(money(t))}원`], amt, note, mult)); cur = [];
+      continue;
+    }
+    if (isAmt && cur.length){
+      let note = ''; const extra = [];
+      // 금액 열 뒤의 칸 읽기: 계약자·업체 같은 열은 자리대로, 비고는 짧은 메모일 때만
+      for (const col of trailCols){
+        if (k + 1 >= body.length) break;
+        const nx = body[k + 1];
+        if (TOTAL_RE.test(nx.replace(/\s+/g, '')) || (nx && AMT_RE.test(nx))) break;
+        if (/^비고/.test(col)){
+          if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx))){ note = nx; k++; }
+        } else { if (nx) extra.push(`${col} ${nx}`); k++; }
+      }
+      rows.push(makeRow(cur[0], [...cur.slice(1), ...extra], money(t), note, mult)); cur = [];
+    } else if (eqAmt){
+      if (!cur.length){
+        // '다과 10,000원 × 30명 = 300,000원'처럼 항목명과 식이 한 줄에 있으면 그 줄 하나가 한 행
+        const sp = t.match(/^(.*?[가-힣A-Za-z)\]])\s+(\d[\s\S]*)$/);
+        rows.push(makeRow(sp ? sp[1] : t, [t], '', '', mult));
+        continue;
+      }
+      cur.push(t);
+      // 같은 행에 "= 금액" 줄이 여러 개 이어질 수 있으므로, 다음 줄도 식이면 계속 모음
+      let q = k + 1; while (q < body.length && !body[q]) q++;
+      if (q < body.length && /=\s*[\d,]+\s*원?\s*$/.test(body[q])) continue;
+      if (q < body.length && hasNote && NOTE_LIKE.test(body[q])){ rows.push(makeRow(cur[0], cur.slice(1), '', body[q], mult)); cur = []; k = q; continue; }
+      rows.push(makeRow(cur[0], cur.slice(1), '', '', mult)); cur = [];
+    } else cur.push(t);
+  }
+  if (cur.length > 1 && !fallback && !hasAmt) rows.push(makeRow(cur[0], cur.slice(1), '', '', mult));   // 금액 열이 있는 표에서 금액 없이 남은 줄은 행이 아님
+  return {rows:fallback ? rows.filter(r => r.amount) : rows, sum};   // 보조 규칙에서는 금액이 확인된 행만
+}
+
+function parseTsv(seg, mult){
+  const lines = seg.map(l => l.split('\t').map(c => c.trim())).filter(r => r.some(Boolean));
+  const hi = lines.findIndex(r => r.filter(Boolean).length >= 2 && r.filter(Boolean).every(c => HEAD_RE.test(c)));
+  const head = hi >= 0 ? lines[hi] : [];
+  const col = re => head.findIndex(h => re.test(h));
+  const cIdx = col(/^(연번|번호|순번|No)/i), cAmt = col(/^(금액|예산액|소요\s*예산)/), cNote = col(/^비고/);
+  let cCont = col(/^(구분|내용|항목|품목|세부\s*항목)$/);
+  const rows = []; let sum = '';
+  for (const r of lines.slice(hi + 1)){
+    const cells = r.filter(Boolean);
+    if (!cells.length || cells.every(c => SKIP_RE.test(c))) continue;
+    if (cells.some(c => TOTAL_RE.test(c))){ const n = cells.find(c => AMT_RE.test(c)); if (n) sum = fmt(money(n) * mult); continue; }
+    if (cells.some(c => SUBTOTAL_RE.test(c))) continue;
+    const content = cCont >= 0 ? r[cCont] : (cIdx >= 0 ? r[cIdx + 1] : r[0]);
+    const basisCells = r.filter((c, q) => q !== cIdx && q !== cAmt && q !== cNote && c !== content);
+    rows.push(makeRow(content || '', basisCells, cAmt >= 0 && r[cAmt] ? money(r[cAmt]) : '', cNote >= 0 ? r[cNote] || '' : '', mult));
+  }
+  return {rows, sum};
+}
+
+// 예산항목 표: 배정액, 기 청구액, 청구 전 잔액, 본건 청구액, 청구 후 잔액 (0원·음수 포함)
+// 예산 줄이 여러 개(예: 기기구입비 + 소모품비)면 줄마다 읽고, 화면에는 열별 합계를 보여 줌
+function parseBudgetItems(L){
+  const EMPTY = {sum:['','','','',''], lines:[], reqTotal:''};
+  const byTitle = L.findIndex(l => /예산\s*항목/.test(l));
+  const r = byTitle >= 0 ? readBudgetItems(L, byTitle) : EMPTY;
+  if (r.lines.length || r.sum[0] !== '') return r;
+  // 표 제목이 없거나('5. 예산'뿐) 제목이 표 아래에 있으면 '배정액' 열 제목으로 찾음
+  const h = L.findIndex(l => /배정\s*(예산)?\s*액|배정\s*예산/.test(l));
+  return h < 0 ? EMPTY : readBudgetItems(L, Math.max(0, h - 6));
+}
+function readBudgetItems(L, i){
+  const EMPTY = {sum:['','','','',''], lines:[], reqTotal:''};
+  let j = L.findIndex((l, k) => k > i && /^붙\s*임|^예산\s*전용/.test(l));   // '추경이전 배정액' 같은 열 제목에서 멈추지 않게
+  if (j < 0) j = L.length;
+  const seg = L.slice(i + 1, j);
+  // '예산항목' 제목 아래가 배정액·잔액 표가 아니면(산출 표 등) 읽지 않음
+  if (!seg.slice(0, 15).some(l => /배정|청구\s*전|잔\s*액|기\s*청구/.test(l))) return EMPTY;
+  const ctx = L.slice(Math.max(0, i - 1), i + 3).join(' ');
+  const mult = /단위\s*[:：]?\s*천\s*원/.test(ctx) ? 1000 : /단위\s*[:：]?\s*만\s*원/.test(ctx) ? 10000 : 1;
+  const isNum = l => /^-?[\d,]+\s*원?$/.test(l);
+  const conv = n => fmt(money(n.replace(/\s*원$/, '')) * mult);
+  const lines = []; let cur = null, prev = '', reqTotal = '';
+  const CODE_IN = /\(?\s*[A-Z]\d{2,}(-\d+)+\s*\)?/;
+  for (let k = 0; k < seg.length; k++){
+    const l = seg[k];
+    if (/합\s*계/.test(l)){
+      const n = (l.match(/([\d,]{3,})/) || [])[1] || seg.slice(k + 1).find(isNum);
+      if (n) reqTotal = conv(n);
+      break;
+    }
+    if (CODE_IN.test(l)){
+      if (cur && cur.nums.length === 5) lines.push(cur);
+      const nm = l.replace(CODE_IN, '').trim();
+      cur = {name:nm || prev, nums:[]};
+    } else if (cur && cur.nums.length < 5 && isNum(l)) cur.nums.push(conv(l));
+    else if (cur && cur.nums.length < 5 && /^[-–—]$/.test(l)) cur.nums.push('');   // '-'는 빈 칸
+    if (!isNum(l)) prev = l;
+  }
+  if (cur && cur.nums.length === 5) lines.push(cur);
+  if (!lines.length){
+    // 사업코드가 없으면 마지막 열 제목 다음 숫자 5개
+    const start = seg.reduce((a, l, k) => /잔액|청구액|배정액/.test(l) ? k : a, -1);
+    const nums = [];
+    for (const l of seg.slice(start + 1)){
+      if (isNum(l)) nums.push(conv(l));
+      if (/합\s*계/.test(l) || nums.length === 5) break;
+    }
+    // 4열 형식: 배정액(A) | 기 청구금액(B) | 금번 신청금액(C) | 최종잔액(D=A-B-C) → 청구 전 잔액은 A−B로 계산
+    if (nums.length === 4 && !seg.some(l => /청구\s*전/.test(l)))
+      return {sum:[nums[0], nums[1], fmt(money(nums[0]) - money(nums[1])), nums[2], nums[3]], lines:[], reqTotal};
+    return nums.length === 5 ? {sum:nums, lines:[], reqTotal} : EMPTY;
+  }
+  const sum = lines.length === 1 ? lines[0].nums.slice()
+    : [0, 1, 2, 3, 4].map(c => lines.some(ln => ln.nums[c] !== '') ? fmt(lines.reduce((a, ln) => a + (money(ln.nums[c]) || 0), 0)) : '');
+  return {sum, lines, reqTotal};
+}
+
+// 구매 품목 표: 번호 | (접수번호) | 품명 | 규격 | 수량 | (납품장소) — 품명과 수량만 뽑음
+function parseItems(L){
+  const h = L.findIndex(l => /^품\s*명$/.test(l));
+  if (h < 0) return parseSimpleItems(L);
+  let s = h; while (s > 0 && /^(번호|연번|접수\s*번호|순번)$/.test(L[s - 1])) s--;
+  const head = []; let k = s;
+  while (k < L.length && /^(번호|연번|순번|접수\s*번호|품\s*명|규격.*|모델.*|수\s*량|단\s*위|납품\s*장소|용도|비고|단가|금액)$/.test(L[k])) head.push(L[k++]);
+  const hasRecv = head.some(x => /접수/.test(x));
+  if (!head.some(x => /^(번호|연번|순번)$/.test(x))){
+    // 번호 열이 없는 표: 품명 → 규격(여러 줄) → 수량 → 납품장소(여러 줄) …
+    // 수량 다음 줄이 '- 규격'으로 이어지면 새 품목의 품명으로 봄
+    const items = []; let cur = null, st = 1;
+    for (; k < L.length; k++){
+      const t = L[k];
+      if (/^([가-하]|\d{1,2})[.)]\s/.test(t) || /구매\s*금액|소요\s*예산/.test(t)) break;
+      if (st === 1){ cur = {name:t, qty:''}; items.push(cur); st = 2; continue; }
+      if (st === 2 && /^\d{1,4}\s*(개|대|식|EA|set|세트)?$/i.test(t)){ cur.qty = t.replace(/\D+$/, ''); st = 3; continue; }
+      if (st === 3 && /^[-•·▪]/.test(L[k + 1] || '')){ cur = {name:t, qty:''}; items.push(cur); st = 2; }
+    }
+    return items;
+  }
+  const items = []; let expect = 1, st = 0, cur = null;   // st 0: 번호 기다림, 1: 품명, 2: 수량 찾는 중, 3: 다음 번호까지
+  for (; k < L.length; k++){
+    const t = L[k];
+    if (/^([가-하]|\d{1,2})\.\s/.test(t) || /구매\s*금액|소요\s*예산/.test(t)) break;
+    if (t === String(expect) && (st === 0 || st === 3)){ if (cur) items.push(cur); cur = {name:'', qty:''}; expect++; st = 1; continue; }
+    if (st === 1){ if (hasRecv && /^\d{3,}$/.test(t)) continue; cur.name = t; st = 2; continue; }
+    if (st === 2 && /^\d{1,4}$/.test(t)){ cur.qty = t; st = 3; continue; }
+  }
+  if (cur && cur.name) items.push(cur);
+  return items;
+}
+
+// 번호 없는 도입품목 표: 항목 | 수량(1식 등) | 주요 기능 — 기능 설명(• …)은 건너뜀
+function parseSimpleItems(L){
+  const h = L.findIndex((l, k) => /^(항\s*목|품\s*목|도입\s*품목)$/.test(l) && /^수\s*량$/.test(L[k + 1] || ''));
+  if (h < 0) return [];
+  let k = h + 2;
+  while (k < L.length && /^(주\s*요\s*기\s*능|기\s*능|규\s*격|비\s*고|용\s*도|사\s*양)$/.test(L[k])) k++;
+  const QTY = /^\d+\s*(식|개|대|본|copy|카피|EA|set|세트|user|유저|명|건|copies)?$/i;
+  const items = []; let cur = null;
+  for (; k < L.length; k++){
+    const t = L[k];
+    if (/^※|^([가-하]|\d{1,2})[.)]\s/.test(t)) break;
+    if (/^[•·\-▪◦○●]/.test(t)) continue;                 // 기능 설명
+    if (QTY.test(t)){ if (cur && !cur.qty) cur.qty = t; continue; }
+    cur = {name:t, qty:''}; items.push(cur);
+  }
+  return items;
+}
+
+// 공종별 계약(예정)금액 현황: '1) 건축공사: 금 473,000,000원 (…)' 목록 + 총 배정 예산액·소계·예산 잔액
+function parseWorkParts(L){
+  const i = L.findIndex(l => /공종별|분야별\s*계약|공종\s*별/.test(l));
+  if (i < 0) return null;
+  const parts = []; let subtotal = NaN, budget = NaN, remain = NaN;
+  const amt = s => { const m = s.match(/금?\s*([\d,]{4,})\s*원/); return m ? num(m[1]) : NaN; };
+  L.slice(Math.max(0, i - 3), i + 15).forEach(l => {
+    const pm = l.match(/^\d{1,2}\s*\)\s*(.+?)\s*[:：]\s*금?\s*([\d,]{4,})\s*원\s*(?:\((.*?)\))?/);
+    if (pm) parts.push({name:pm[1].trim(), amount:num(pm[2]), note:(pm[3] || '').trim(), current:/금회|본건|이번/.test(pm[3] || '')});
+    else if (/소\s*계|합\s*계/.test(l)) subtotal = amt(l);
+    else if (/총\s*배정|배정\s*예산/.test(l)) budget = amt(l);
+    else if (/예산\s*잔액|잔\s*액/.test(l)) remain = amt(l);
+  });
+  return parts.length ? {parts, subtotal, budget, remain} : null;
+}
+
+// 비교견적 표: 번호 | 업체명 | 금액 | 비고(발주·선정)
+function parseQuotes(L){
+  const i = L.findIndex(l => /비교\s*견적|견적\s*비교|복수\s*견적/.test(l));
+  if (i < 0) return [];
+  const h = L.findIndex((l, k) => k >= i && k <= i + 6 && /^업체\s*명?$|^견적\s*업체$/.test(l));
+  if (h < 0) return [];
+  let k = h + 1; while (k < L.length && /^(금액|견적\s*금액|비고|번호)$/.test(L[k])) k++;
+  const out = []; let expect = 1, cur = null;
+  for (; k < L.length; k++){
+    const t = L[k];
+    if (/^([가-하]|\d{1,2})\.\s/.test(t) || /사업비\s*구성|^붙임/.test(t)) break;
+    if (t === String(expect)){ if (cur) out.push(cur); cur = {vendors:[], amount:'', note:''}; expect++; continue; }
+    if (!cur) continue;
+    if (/^₩?\s*[\d,]{4,}\s*원?$/.test(t)) cur.amount = money(t.replace(/₩/g, ''));
+    else if (!cur.vendors.length) cur.vendors = t.split(/\s*[,，/]\s*/).filter(Boolean);
+    else cur.note = (cur.note + ' ' + t).trim();
+  }
+  if (cur) out.push(cur);
+  return out.filter(q => q.vendors.length).map(q => ({...q, selected:/발주|선정|낙찰|계약/.test(q.note)}));
+}
+
+function extract(masked){
+  const L = linesOf(masked);
+  const all = L.join('\n');
+  const out = {name:'', date:'', dow:'', named:0, extra:false, meal:false, rows:[], sum:'', total:'', totalKo:'', budget:['','','','',''], attach:[], text:all};
+
+  const nm = all.match(/행\s*사\s*(?:내\s*용|명)\s*[:：]\s*(.+)/) || all.match(/사\s*업\s*명\s*[:：]\s*(.+)/) || all.match(/과\s*업\s*명\s*[:：]\s*(.+)/)
+          || all.match(/장\s*학\s*금\s*명\s*[:：]\s*(.+)/) || all.match(/프\s*로\s*그\s*램\s*명\s*[:：]\s*(.+)/)
+          || all.match(/공\s*사\s*명\s*[:：]\s*(.+)/) || all.match(/용\s*역\s*명\s*[:：]\s*(.+)/);
+  if (nm) out.name = nm[1].trim();
+  else {
+    // '사업명:' 줄이 없으면 본문 문장에서: '~를 위해 ○○를 진행하고자', '이와 관련하여 ○○를 시행하고자'
+    // 후보가 여러 개면 가장 짧은 것(위해·관련하여가 여러 번 나와도 이름 부분만 남게)
+    const flat = all.replace(/\n/g, ' ');
+    const cands = [...flat.matchAll(/(?:위해|위하여|일환으로|관련하여)\s*,?\s*/g)].map(m => {
+      const rest = flat.slice(m.index + m[0].length);
+      const mm = rest.match(/^([^.。]{4,80}?)(?:을|를)\s*(?:다음과\s*같이\s*|아래와\s*같이\s*)?(진행|실시|시행|추진|개최|운영|교체|구입|구매|설치|도입)하/);
+      if (!mm) return null;
+      const nm = mm[1].replace(/^(위와|이와)\s*/, '').trim();
+      return /교체|구입|구매|설치|도입/.test(mm[2]) ? `${nm} ${mm[2]}` : nm;   // '노후 컴퓨터' → '노후 컴퓨터 교체'
+    }).filter(Boolean).sort((a, b) => a.length - b.length);
+    if (cands.length) out.name = cands[0];
+  }
+
+  const dl = L.find(l => /일시|일자|행사일|개최일|운영\s*기간|사업\s*기간|조사\s*(시기|기간)|접수\s*기간|모집\s*기간|신청\s*기간/.test(l)) || '';   // 일정표 속 날짜를 행사일로 오인하지 않게
+  const dm = dl.match(/(\d{4})\s*[.\-년]\s*(\d{1,2})\s*[.\-월]\s*(\d{1,2})\s*\.?\s*일?\s*(?:\(\s*([일월화수목금토])\s*\))?/);
+  if (dm){ out.date = `${dm[1]}-${dm[2].padStart(2,'0')}-${dm[3].padStart(2,'0')}`; out.dow = dm[4] || ''; }
+
+  const part = section(L, /참석/, /^라\.|식순|^\d+\.\s*$/);
+  const pj = part.join(' ');
+  const tok = pj.match(/\[[A-Z]\]|\[P\d+\]|\[이름\]|[가-힣]○{1,3}/g);
+  out.named = tok ? tok.length : 0;
+  out.extra = /관계자|등\s|외\s*\d*\s*명|일부\s*변동/.test(pj.replace(/일부\s*변동\s*가능/, ''));
+
+  const prog = section(L, /식순|일정|프로그램/, /소요\s*예산|^마\./);
+  out.meal = /오찬|만찬|식사|점심|저녁|중식|석식|리셉션|만찬/.test(prog.join(' '));
+
+  const bt = parseBudgetTable(masked);
+  out.rows = bt.rows; out.sum = bt.sum;
+  // 사업명이 '○○ 용역'·'○○ 공사'면 분야별 행(건축·전기 등)도 그 유형으로
+  const docKind = /용역/.test(out.name) ? 'service' : /공사/.test(out.name) ? 'construction' : '';
+  if (docKind) out.rows.forEach(r => { if (r.type === 'goods') r.type = docKind; });
+
+  // 구매 기안: 품목 표, 비교견적 표, 구매업체
+  out.items = parseItems(L);
+  out.quotes = parseQuotes(L);
+  const bv = all.match(/구매\s*업체\s*[:：]\s*(.+)/);
+  out.buyVendor = bv ? bv[1].trim() : '';
+  if (!out.name && out.items.length) out.name = out.items[0].name + (out.items.length > 1 ? ` 외 ${out.items.length - 1}종 구매` : ' 구매');
+
+  // 소요예산: "소요예산: 1,650,000원(금일백…)" 또는 "3. 소요예산 / 가. 금액: 금11,340,000원"
+  const ti = L.findIndex(l => /소요\s*예산|총\s*사업비|총\s*소요액|구매\s*(예정\s*)?금액|계약\s*(예정\s*)?금액|공사\s*(예정\s*)?금액|용역\s*(예정\s*)?금액|사업비\s*총액|구입\s*(예정\s*)?(비용|금액)|소요\s*비용/.test(l));
+  if (ti >= 0){
+    const near = L.slice(ti, ti + 3).join(' ');
+    const tm = near.match(/금?\s*([\d,]{4,})\s*원/) || near.match(/([\d,]{4,})/);
+    if (tm) out.total = tm[1];
+    const km = near.match(/(?<![가-힣])(금\s*[일이삼사오육칠팔구십백천만억][일이삼사오육칠팔구십백천만억\s]*원\s*정?)/);   // '장학금 총액'의 '금'은 제외
+    if (km) out.totalKo = km[1].replace(/\s+/g, '');
+  }
+  if (!out.total && out.sum) out.total = out.sum;
+
+  // 부가세 표기: (VAT 포함) / (VAT 별도)
+  if (/(VAT|부가세|부가가치세)\s*(별도|미포함|제외)/i.test(all)) out.vat = false;
+  else if (/(VAT|부가세|부가가치세)\s*포함/i.test(all)) out.vat = true;
+
+  // 세부 산출내역 표가 없는 기안(계약 건 등): 소요예산 전체를 한 행으로
+  if (!out.rows.length && out.total){
+    const isSch = classify(out.name || '') === 'scholarship' || /\(\s*03\s*\)\s*장학금|장\s*학\s*금\s*명|장학생을?\s*선발/.test(all);
+    if (isSch){
+      // 장학금: '1인당 400만원' × '선발인원 12명'
+      const UNIT = {'억':1e8, '천만':1e7, '백만':1e6, '만':1e4};
+      const pm = all.match(/1\s*인\s*당\s*([\d,.]+)\s*(억|천만|백만|만)?\s*원/);
+      const per = pm ? Math.round(num(pm[1]) * (UNIT[pm[2]] || 1)) : NaN;
+      const cm = all.match(/(?:선발|지급|수혜)\s*(?:인원|대상)\s*[:：]?\s*(\d+)\s*명/) || all.match(/소요\s*예산[^\n]*\(\s*(\d+)\s*명\s*\)/);
+      const cnt = cm ? cm[1] : '';
+      out.rows = [{content:out.name || '장학금', type:'scholarship',
+        basis:!isNaN(per) && cnt ? `1인당 ${fmt(per)}원 × ${cnt}명` : NO_DETAIL,
+        unit:isNaN(per) ? '' : fmt(per), qty:cnt, amount:out.total, grade:'', hours:''}];
+      out.singleRow = true;
+      if (!out.sum) out.sum = out.total;
+    }
+  }
+  if (!out.rows.length && out.total){
+    const isBuy = out.items.length || /품\s*명|기자재|물품\s*구매|구매하고자/.test(all)
+      // 소프트웨어·솔루션 도입(구입)은 물품 (구매규정 제2조제2호: 물품에 소프트웨어 포함)
+      || (/솔루션|소프트웨어|S\/W|라이선스|라이센스|패키지/i.test(all) && /도입|구입|구매|납품/.test(all));
+    const kind = isBuy ? 'goods'
+               : /설계\s*용역|감리/.test(out.name || '') ? 'service'
+               : /공사|시공|리모델링|개보수|증축/.test(out.name || '') ? 'construction'
+               : /공사\s*(개요|명|기간|범위|금액)|시설\s*공사/.test(all) ? 'construction'   // '교수학습개발원'의 '개발'보다 우선
+               : /용역|개발|구축|고도화|유지\s*보수|위탁|대행|컨설팅|임차/.test(all) ? 'service'
+               : classify(out.name || '') !== 'goods' ? classify(out.name) : 'goods';
+    const itemTxt = out.items.length ? ' · 품목: ' + out.items.map(t => `${t.name}${t.qty ? ' ' + t.qty : ''}`).join(', ') + (out.items.length > 1 ? ' (품목별 금액은 견적서)' : '') : '';
+    // 품목이 하나이고 수량이 있으면 1개당 단가도 채움 (예: 4,092,000 ÷ 6대 = 682,000)
+    const one = out.items.length === 1 && /^\d+$/.test(out.items[0].qty) ? out.items[0] : null;
+    const perUnit = one ? money(out.total) / Number(one.qty) : NaN;
+    out.rows = [{content:out.name || '소요예산 전체', type:kind, basis:NO_DETAIL + itemTxt, unit:Number.isInteger(perUnit) ? fmt(perUnit) : '',
+                 qty:Number.isInteger(perUnit) ? one.qty : '', amount:out.total, grade:'', hours:''}];
+    out.singleRow = true;
+    if (!out.sum) out.sum = out.total;
+  }
+
+  const bi = parseBudgetItems(L);
+  out.budget = bi.sum; out.budgetLines = bi.lines; out.reqTotal = bi.reqTotal;
+  out.workParts = parseWorkParts(L);
+
+  out.attach = parseAttachments(L);
+  return out;
+}
+
+// 붙임 목록: 기안문 맨 아래 "붙임 1. ○○ 1부. 2. ○○ 각 1부. 끝." (번호 없음·부수 없음·쉼표 나열도 처리)
+function parseAttachments(L){
+  let i = -1;
+  for (let k = L.length - 1; k >= 0; k--) if (/^붙\s*임/.test(L[k])){ i = k; break; }   // 맨 아래 '붙임'부터
+  if (i < 0) return [];
+  let txt = L.slice(i).join('\n');
+  const end = txt.search(/(^|[\s.])끝\s*\.?\s*$/m);
+  if (end >= 0) txt = txt.slice(0, end + 1);
+  txt = txt.replace(/^붙\s*임\s*[:：]?\s*/, '').replace(/\s*끝\s*\.?\s*$/, '')
+           .replace(/\s*\([^)]*(비밀번호|비번|암호|삭제)[^)]*\)/g, '');   // '(비번: …)' 같은 괄호는 문서명에서 뺌
+  // 괄호 안의 점·괄호는 번호로 오인하지 않게 잠시 바꿔 둠: '(2026. 10. 14.)', '(2026.3.)'
+  let depth = 0;
+  txt = [...txt].map(ch => {
+    if (ch === '(' || ch === '（'){ depth++; return depth > 1 ? '⦅' : ch; }
+    if (ch === ')' || ch === '）'){ depth = Math.max(0, depth - 1); return depth > 0 ? '⦆' : ch; }
+    return depth > 0 && ch === '.' ? '․' : ch;
+  }).join('');
+  // 번호로 나눔: '1. ○○ 1부. 2. ○○'뿐 아니라 '1부.2. ○○'처럼 붙여 쓴 경우도 ('2026.3.31' 같은 날짜는 제외)
+  let items = /(^|\s)\d+\s*[.)]\s*\S/.test(txt)
+    ? txt.split(/(?:^|(?<=[\s.]))\d{1,2}\s*\.(?!\d)\s*|(?:^|(?<=\s))\d{1,2}\s*\)\s*/)
+    : txt.split(/\n|,\s*|，/);
+  // '관련근거 및 견적서 각 1부'처럼 '각 N부'가 붙은 항목은 '및'으로 나눔
+  items = items.flatMap(s => /각\s*\d+\s*부/.test(s) && /\s및\s/.test(s)
+    ? s.replace(/\s*각\s*\d+\s*부.*$/, '').split(/\s+및\s+/) : [s]);
+  return items
+    .map(s => s.replace(/․/g, '.').replace(/⦅/g, '(').replace(/⦆/g, ')'))
+    .map(s => s.replace(/\s+/g, ' ').trim()
+               .replace(/\s*\(?\s*(각\s*)?\d+\s*(부|매|권|식|건|개|종)\s*\)?\s*\.?\s*$/, '')
+               .replace(/[.。]\s*$/, '').trim())
+    .filter(s => s && !/^끝$/.test(s));
+}
+
+/* ───────── 점검 ───────── */
+function procure(amount, kind, vat, sole){
+  // 지침 15쪽 조견표(추정가격+부가세) + 구매규정 제9조(추정가격). 엄격한 쪽 적용
+  const withVat = vat ? amount : amount * 1.1;
+  const est = vat ? amount / 1.1 : amount;
+  const res = [];
+  const lim = kind === 'service' ? 2e7 : kind === 'construction' ? 2.2e7 : 1.1e7;   // 일반 수의계약 상한(부가세 포함, 지침 15쪽)
+  // 단가계약 품목: 계약한 금액·수량 범위 안에서는 견적비교·입찰 절차 없이 조달 (구매규정 제10조)
+  if (sole && sole.unitContract && kind === 'goods'){
+    res.push(['ok', '단가계약 품목으로 구매한다고 적혀 있습니다. 단가계약을 맺은 금액·수량 범위 안에서는 견적비교·입찰 절차 없이 조달할 수 있습니다', R + '제10조']);
+    res.push(['info', '단가계약 품목 가운데 행정지원처장이 따로 고시한 품목은 해당 부서에서 직접 구매합니다. 단가계약 범위(금액·수량·기간)를 넘지 않는지 확인하세요', R + '제4조제6호, 제10조제2항']);
+    return res;
+  }
+  // 일반 수의계약 한도를 넘는데 기안문에 수의계약 사유(구매규정 제11조 등)를 적은 경우
+  if (sole && sole.on && withVat > lim){
+    const cite = [sole.law, sole.cite].filter(Boolean).join(', ');
+    res.push(['ok', `수의계약 사유가 기안문에 적혀 있습니다${cite ? ` (${cite})` : ''}. 사유를 확인할 수 있는 증빙을 갖춰 보관하세요`, G + '16쪽 / ' + R + '제11조제1항']);
+    if (est > 2e7) res.push(['info', '추정가격 2,000만 원 초과 수의계약은 3일 이상 견적서 제출 공고가 원칙이지만, 구매규정 제11조제1항 각 호 사유에 해당하면 공고하지 않을 수 있습니다', R + '제11조제3항 / ' + G + '15쪽']);
+    res.push(sole.nara ? ['ok', '나라장터로 진행한다고 적혀 있습니다(사업비 계약은 금액에 따라 나라장터 이용)', G + '15쪽']
+                       : ['warn', '이 금액의 사업비 계약은 나라장터 이용 대상입니다. 기안문에 진행 방법(나라장터)을 적으세요', G + '15쪽']);
+    return res;
+  }
+  // 수의계약 한도를 넘고 기안문에 입찰(일반·제한·지명경쟁, 협상)로 진행한다고 적은 경우
+  if (sole && sole.bid && withVat > lim){
+    res.push(['ok', `입찰로 진행한다고 적혀 있습니다(${sole.bid})`, R + '제9조제2항 / ' + G + '15쪽']);
+    res.push(sole.nara ? ['ok', '나라장터로 공고한다고 적혀 있습니다', G + '15쪽']
+                       : ['warn', '사업비 입찰은 전자조달시스템(나라장터)에 공고해야 합니다. 학교 홈페이지 등에만 공고하면 적정한 절차로 인정되지 않습니다. 공고 방법을 적으세요', G + '15쪽']);
+    res.push(['info', '입찰공고는 입찰서 제출마감일 전날부터 7일 전까지 게시하세요(재공고·긴급한 경우 5일)', R + '제14조제2항']);
+    res.push(['info', '경쟁입찰은 예정가격조서를 작성해 위임전결규정에 따라 가격 사정을 받으세요(2개 이상 사업자의 거래실례가격·견적가격 등 활용)', R + '제7조']);
+    if (/제한\s*경쟁/.test(sole.bid))
+      res.push(['info', '참가자격 제한(지역 등) 사유를 입찰공고에 적으세요. 학교 규정에 없는 기준은 국가계약법 시행령(제한경쟁입찰)을 참고합니다', R + '제28조제3항']);
+    if (kind === 'construction'){
+      res.push(['info', '시설공사 입찰은 입찰 전에 현장설명을 하고(추정가격 10억 원 미만은 제출마감일 전날부터 7일 전), 현장설명일 전날부터 7일 전에 공고합니다', R + '제13조제2항·제3항, 제14조제3항']);
+      if (est > 3e7) res.push(['info', '계약금액 3천만 원을 넘는 공사는 하자보수보증금(계약금액의 2~10%)을 받아야 합니다', R + '제25조']);
+    }
+    return res;
+  }
+  if (kind === 'construction'){
+    // 지침 15쪽 조견표(공사) + 구매규정 제9조(공사 3,000만 원 이하 복수견적 수의계약)
+    if (withVat <= 2.2e7){
+      res.push(['ok', `일반 수의계약 구간(공사, 부가세 포함 2,200만 원 이하). 2인 이상 복수견적${est <= 5e5 ? ', 추정가격 50만 원 이하라 1인 견적 가능' : ''}`, G + '15쪽 / ' + R + '제9조제1항']);
+      if (est <= 2e7) res.push(['info', '발주금액 2,000만 원 이하 시설공사는 시설관리부서에서 자체 발주할 수 있습니다', R + '제8조제2항']);
+    } else if (withVat <= 3.3e7)
+      res.push(['warn', '소액수의 견적 구간(공사 2,200만 원 초과~3,300만 원 이하): 인터넷 입찰정보 사이트에 3일 이상 견적서 제출 공고가 필요합니다', G + '15쪽 / ' + R + '제11조제3항']);
+    else if (withVat <= 8.8e7)
+      res.push(['err', '입찰 대상(공사 3,300만 원 초과). 일반시설공사는 8,800만 원 이하 일반 입찰, 전문·건설공사는 각 1억1천만·2억2천만 원까지 일반 입찰입니다', G + '15쪽 / ' + R + '제9조제2항']);
+    else res.push(['err', '나라장터 입찰 대상(일반시설공사 8,800만 원 초과 / 전문공사 1억1천만 원, 건설공사 2억2천만 원 초과)', G + '15쪽']);
+    if (est > 3e7) res.push(['info', '계약금액 3천만 원을 넘는 공사는 하자보수보증금(계약금액의 2~10%)을 받아야 합니다', R + '제25조']);
+    return res;
+  }
+  if (kind === 'service'){
+    if (withVat <= 2e7) res.push(['ok', `일반 수의계약 구간(용역, 부가세 포함 2,000만 원 이하). 2인 이상 복수견적${est <= 5e5 ? ', 추정가격 50만 원 이하라 1인 견적 가능' : ''}`, G + '15쪽 / ' + R + '제9조제1항']);
+    else if (withVat <= 2.2e7) res.push(['warn', '나라장터 수의계약 구간(용역 2,000만 원 초과~2,200만 원 이하). 사업비 건은 나라장터를 이용하세요', G + '15쪽']);
+    else res.push(['err', '나라장터 입찰 대상(용역 2,200만 원 초과). 나라장터 공고가 필요합니다', G + '15쪽 / ' + R + '제9조제2항']);
+    if (withVat > 1.8e7 && withVat <= 2e7 || withVat > 1.98e7 && withVat <= 2.2e7) res.push(['warn', '수의계약 한도에 가깝습니다. 분할·연속 구매나 연간계약 미실시가 아닌지 확인하세요', G + '16쪽']);
+    return res;
+  }
+  if (withVat <= 1.1e7){
+    res.push(['ok', est <= 5e5 ? '일반 수의계약 · 추정가격 50만 원 이하라 1인 견적 가능' : '일반 수의계약 · 2인 이상 복수견적 필요', G + '15쪽 / ' + R + '제9조제1항' + (est <= 5e5 ? '제2호' : '')]);
+    if (est > 4.5e5 && est <= 5e5) res.push(['info', '1인 견적 한도(추정가격 50만 원)에 가깝습니다. 실제 견적이 넘으면 2인 이상 복수견적이 필요합니다', R + '제9조제1항']);
+    if (est <= 1e6) res.push(['info', '추정가격 100만 원 이하라 부서에서 직접 구매할 수 있습니다. 구매의뢰서를 쓸 때는 수의계약(단일견적) 근거조항을 적으세요', R + '제4조제6호, 별지 제1호 서식']);
+    if (withVat > 0.99e7) res.push(['warn', '수의계약 한도에 가깝습니다. 분할·연속 구매가 아닌지 확인하세요', G + '16쪽']);
+  } else if (withVat <= 2e7) res.push(['err', '일반 입찰 대상(물품, 부가세 포함 1,100만 원 초과)', G + '15쪽 / ' + R + '제9조제2항']);
+  else res.push(['err', '나라장터 입찰 대상(물품, 부가세 포함 2,000만 원 초과). 나라장터 공고가 필요합니다', G + '15쪽']);
+  return res;
+}
+
+// 사업비 구성 항목의 비목: '(04)교육연구 환경개선비'처럼 줄이 나뉘거나 띄어 써도 찾음
+const BIMOK_LABEL = {prog:'교육·연구 프로그램 개발·운영비', equip:'실험·실습 기자재 구입·운영비', sch:'장학금', env:'교육·연구 환경개선비', etc:'그 밖의 사업운영 경비', pay:'인건비'};
+function getBimok(T){
+  const c = String(T).replace(/[\s·ㆍ‧∙.]/g, '');
+  if (/실험실습(기자재|장비)/.test(c)) return 'equip';
+  if (/(교육연구)?환경개선비/.test(c)) return 'env';
+  if (/\(0?3\)장학금/.test(c)) return 'sch';
+  if (/교육연구프로그램개발운영비|프로그램개발운영비/.test(c)) return 'prog';
+  if (/그밖의사업운영경비|기타사업운영경비/.test(c)) return 'etc';
+  return '';
+}
+
+function runChecks(f){
+  const R_ = [];
+  const add = (lv, item, msg, basis = '') => R_.push({lv, item, msg, basis});
+
+  // 날짜
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f.date)){
+    const [y, m, d] = f.date.split('-').map(Number);
+    const dt = new Date(y, m - 1, d), real = DOW[dt.getDay()];
+    if (f.dow && f.dow !== real) add('err', '일자·요일', `${f.date}은 ${real}요일인데 기안문에는 (${f.dow})로 적혀 있습니다`);
+    else add('ok', '일자·요일', `${f.date}(${real})`);
+    if (f.from && f.to && (f.date < f.from || f.date > f.to)) add('err', '사업기간', `행사일이 사업기간(${f.from}~${f.to}) 밖입니다. 계약기간·대금 지급도 사업기간 안이어야 합니다`, G + '15쪽');
+    else add('ok', '사업기간', '행사일이 사업기간 안입니다', G + '15쪽');
+    if (dt.getDay() === 0 || dt.getDay() === 6) add('info', '주말 행사', '주말 행사입니다. 식대·회의비를 집행하면 사유를 남겨 두세요', G + '74쪽');
+  } else if ((() => {
+      // '일시: 2026학년도 10월 말 ~ 2027년 1월 초'처럼 월 단위 기간이면 끝나는 달만 사업기간과 비교
+      // '10월 말 ~ 2027년 1월 초' 또는 '(2026. 9. ~ 2027. 2.)'처럼 점으로 쓴 월 단위 기간
+      const dLine = (f.text || '').split('\n').find(l => /일시|기간|시기/.test(l) && /[~∼]/.test(l) && (/월/.test(l) || /\d{4}\s*\.\s*\d{1,2}\s*\.\s*[~∼]/.test(l)));
+      const mr = dLine && dLine.match(/[~∼]\s*(\d{4})\s*[년.]\s*(\d{1,2})\s*[월.]?(?!\s*\d)/);
+      if (!mr || !f.to) return false;
+      const ym = `${mr[1]}-${mr[2].padStart(2, '0')}`;
+      if (ym > f.to.slice(0, 7)) add('err', '운영 기간', `운영 기간이 ${ym}까지로 사업기간 종료(${f.to})보다 늦습니다`, G + '14쪽, 15쪽');
+      else add('ok', '운영 기간', `운영 기간이 ${ym}에 끝나 사업기간 안입니다(월 단위로 적혀 있어 요일 점검은 생략)`);
+      return true;
+    })()) {
+  } else if (/행사|일시|개최|특강|회의|워크숍|설명회|협약식|간담회/.test(f.text || '')) add('warn', '일자', '행사일을 읽지 못했습니다. ③에서 입력해 주세요');
+  else add('info', '일자', '행사일·시행일이 없는 기안입니다(계약·구매·장학금 건 등). 행사가 있다면 ③에 입력하세요');
+
+  // 본문에 적힌 날짜(요일 표기 있는 것)의 요일이 맞는지: '2026. 9. 29.(화)', '~ 11.16.(월)'(앞 날짜의 연도 사용)
+  {
+    let yr = null; const bad = []; let n = 0;
+    for (const m of (f.text || '').matchAll(/(?:(\d{4})\s*[.년]\s*)?(\d{1,2})\s*[.월]\s*(\d{1,2})\s*[.일]?\s*\(\s*([일월화수목금토])\s*\)/g)){
+      if (m[1]) yr = Number(m[1]);
+      if (!yr) continue;
+      const mo = Number(m[2]), d = Number(m[3]);
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
+      n++;
+      const real = DOW[new Date(yr, mo - 1, d).getDay()];
+      if (real !== m[4]) bad.push(`${yr}. ${mo}. ${d}.(${m[4]}) → ${real}요일`);
+    }
+    if (bad.length) add('err', '본문 날짜 요일', `요일이 맞지 않는 날짜가 있습니다: ${bad.join(', ')}`);
+    else if (n >= 2) add('ok', '본문 날짜 요일', `본문 날짜 ${n}개의 요일이 모두 맞습니다`);
+  }
+
+  // 금액 계산
+  const rows = f.rows.filter(r => r.content || r.amount);
+  const rsum = rows.reduce((a, r) => a + (num(r.amount) || 0), 0);
+  const sum = num(f.sum), total = num(f.total), ko = parseKoreanAmount(f.totalKo);
+  if (rows.length){
+    if (!isNaN(sum) && sum !== rsum) add('err', '예산내역 합계', `항목 합 ${won(rsum)}과 합계 표기 ${won(sum)}가 다릅니다`);
+    else add('ok', '예산내역 합계', `항목 합 ${won(rsum)}`);
+  }
+  if (!isNaN(total)){
+    if (rows.length && total !== rsum) add('err', '소요예산', `소요예산 ${won(total)}과 예산내역 합 ${won(rsum)}이 다릅니다`);
+    if (f.totalKo){
+      if (isNaN(ko)) add('warn', '한글 금액', `'${f.totalKo}'를 숫자로 읽지 못했습니다`);
+      else if (ko !== total) add('err', '한글 금액', `한글 금액(${won(ko)})과 숫자 금액(${won(total)})이 다릅니다`);
+      else add('ok', '한글 금액', `${f.totalKo} = ${won(total)}`);
+    }
+  }
+  rows.forEach(r => {
+    const a = num(r.amount);
+    // '[1,500,000원] 근거 / [180,000원] 근거'처럼 금액 묶음이 여럿이면 묶음마다 따로 검증
+    const segs = [...(r.basis || '').matchAll(/\[([\d,]+)원\]\s*([^\[]*)/g)];
+    if (segs.length >= 2){
+      const segSum = segs.reduce((s, m) => s + num(m[1]), 0);
+      if (!isNaN(a) && segSum !== a) add('err', `${r.content} 산출`, `세부 금액 합 ${won(segSum)}과 금액 ${won(a)}이 다릅니다`);
+      segs.forEach(m => {
+        const ex = parseExprs(m[2]); if (!ex.length) return;
+        const t = ex.reduce((s, e) => s + (isNaN(e.stated) ? e.product : e.stated), 0);
+        if (t !== num(m[1])) add('err', `${r.content} 산출`, `세부 산출식 합 ${won(t)}과 해당 금액 ${won(num(m[1]))}이 다릅니다 (${m[2].trim().slice(0, 30)}…)`);
+        else add('ok', `${r.content} 산출`, `세부 산출식 ${ex.length}개 합 ${won(t)} = ${won(num(m[1]))}`);
+      });
+      return;
+    }
+    const ex = parseExprs(r.basis || '');
+    if (ex.length){
+      // 산출근거의 식(단가 × 인원 × 횟수 = 금액)을 직접 계산
+      ex.forEach(e => {
+        if (!isNaN(e.stated) && e.stated !== e.product)
+          add('err', `${r.content} 산출식`, `${won(e.unit)} × ${e.factors.join(' × ')} = ${won(e.product)}인데 ${won(e.stated)}으로 적혀 있습니다`);
+      });
+      const total = ex.reduce((s, e) => s + (isNaN(e.stated) ? e.product : e.stated), 0);
+      if (!isNaN(a) && total !== a)
+        add('err', `${r.content} 산출`, ex.length === 1 ? `산출근거 ${won(ex[0].unit)} × ${ex[0].factors.join(' × ')} = ${won(total)}인데 금액은 ${won(a)}입니다`
+                                                         : `산출근거의 식 ${ex.length}개 합은 ${won(total)}인데 금액은 ${won(a)}입니다`);
+    } else {
+      const u = num(r.unit), q = num(r.qty);
+      if (!isNaN(u) && !isNaN(q) && !isNaN(a) && u * q !== a) add('err', `${r.content} 산출`, `${won(u)} × ${q} = ${won(u * q)}인데 금액은 ${won(a)}입니다`);
+    }
+  });
+  const b = f.budget.map(num);
+  if (!isNaN(b[0]) && isNaN(b[3]))
+    add('info', '본건 청구액', '예산항목의 본건 청구액이 비어 있습니다(「-」). 계약 후 따로 청구할 예정이면 괜찮지만, 이번 기안으로 예산을 청구한다면 금액을 적으세요');
+  if (b.every(x => !isNaN(x))){
+    const ok1 = b[0] - b[1] === b[2], ok2 = b[2] - b[3] === b[4];
+    if (ok1 && ok2) add('ok', '예산 잔액', `${won(b[2])} − ${won(b[3])} = ${won(b[4])}`);
+    else add('err', '예산 잔액', `잔액 계산이 맞지 않습니다 (배정 − 기청구 = ${won(b[0] - b[1])}, 청구 전 잔액 − 본건 = ${won(b[2] - b[3])})`);
+    if (!isNaN(total) && b[3] !== total) add('err', '본건 청구액', `본건 청구액 ${won(b[3])}과 소요예산 ${won(total)}이 다릅니다`);
+    if (b[4] < 0) add('err', '예산 잔액', '청구 후 잔액이 마이너스입니다');
+  }
+
+  // 수의계약 사유가 적힌 계약 건인지
+  const T = f.text || '';
+  const sole = {
+    on: /수의\s*계약/.test(T) && /수의\s*계약\s*사유|제\s*11\s*조|제\s*26\s*조/.test(T),
+    cite: ((T.match(/구매\s*규정\s*제\s*11\s*조[^,\n]*/) || [''])[0]).trim(),
+    law: ((T.match(/국가계약법\s*시행령\s*제\s*26\s*조[^,\n]*/) || [''])[0]).trim(),
+    nara: /나라장터|전자\s*조달/.test(T),
+    unitContract: /단가\s*계약/.test(T),
+    bid: ((T.match(/(일반|제한|지명)\s*경쟁\s*입찰|협상에\s*의한\s*계약|적격\s*심사/) || [''])[0]).replace(/\s+/g, '')
+  };
+
+  // 항목별 기준
+  const allText =(f.text || '') + ' ' + rows.map(r => r.content + ' ' + r.basis).join(' ');
+  rows.forEach(r => {
+    const a = num(r.amount), u = num(r.unit), q = num(r.qty);
+    const label = r.content || TYPE_LABEL[r.type];
+    if (r.type === 'meal'){
+      const s = r.content + ' ' + r.basis;
+      const hasSnack = /다과|간식|음료/.test(s), hasMeal = /식대|식사|오찬|만찬|도시락/.test(s);
+      let limit, why;
+      if (hasSnack && hasMeal){ limit = MEAL.both; why = '식사와 다과 연속 진행 시 1인 최대 30,000원'; }
+      else if (hasSnack){ limit = MEAL.snack; why = '다과비 1인 최대 10,000원'; }
+      else { limit = MEAL.meal; why = '식사비 1인 최대 25,000원'; }
+      if (!isNaN(u)){
+        if (u > limit) add('err', `${label} 단가`, `1인 ${won(u)} — ${why}을 넘습니다`, G + '38쪽');
+        else if (hasSnack && hasMeal && !f.meal) add('warn', `${label} 단가`, `30,000원은 식사와 다과를 연속으로 할 때만 적용됩니다. 식순에 식사 일정이 없습니다. 오찬이 있으면 식순에 넣고, 다과만 하면 1인 최대 10,000원입니다`, G + '38쪽');
+        else add('ok', `${label} 단가`, `1인 ${won(u)} (${why})`, G + '38쪽');
+      } else add('warn', `${label} 단가`, '1인 단가 × 인원으로 산출근거를 적어 주세요', G + '38쪽');
+      if (!isNaN(q) && f.named){
+        if (q > f.named) add('warn', `${label} 인원`, `산출 인원 ${q}명이 명단 인원 ${f.named}명보다 많습니다${f.extra ? '(관계자 등 인원 미기재)' : ''}. 참석 대상자 외 인원 포함은 지적사례입니다. 인원 근거와 참여자 명단을 갖추세요`, G + '38쪽, 74쪽');
+        else add('ok', `${label} 인원`, `산출 인원 ${q}명 ≤ 명단 ${f.named}명`);
+      }
+    }
+    if (r.type === 'voucher'){
+      if (isNaN(q)) add('err', `${label} 인원수`, '지급 인원수를 명시하세요 (예: 10,000원 × 30명)', G + '37쪽');
+      else add('ok', `${label} 인원수`, `${q}명`);
+      add('info', `${label} 지급대장`, '유가증권(상품권·기프티콘 등)을 지급할 때는 집행지침 52~53쪽의 지급대장(유가증권용)을 반드시 작성하세요. ▸ 내부구성원(학생·교직원): [서식4-1] 소속, 학번/사번, 성명, 금액, 수령일자, 서명 — 주민번호는 적지 않습니다 ▸ 외부인: [서식4-2] 소속, 직위, 성명, 주민번호, 주소, 금액, 수령일자, 서명', G + '37~38쪽, 52~53쪽');
+      if (/전원|모든\s*참여자|참가자\s*전체/.test(allText)) add('warn', `${label} 지급 조건`, '참여자 전원 일괄 지급처럼 보입니다. 단순 참여 대가성 지급은 불가하니 지급 조건(수상, 수료 등)을 적으세요', G + '38쪽, 79쪽');
+      else if (/선정|추첨|선발|우수|수상|입상/.test(r.basis + ' ' + r.content))
+        add('ok', `${label} 지급 대상`, '참여자(응답자) 중 일부를 선정해 지급한다고 적혀 있습니다(전원 일괄 지급이 아님). 선정 기준과 결과를 남겨 두세요', G + '38쪽, 79쪽');
+      else add('info', `${label} 참여 대가성`, '행사·프로그램 참여율을 높이려는 단순 참여 대가성 지급(참여자 전원 일괄 지급 등)은 불가합니다. 지급 대상과 조건(선정·수상·수료 등)을 적으세요', G + '38쪽, 79쪽');
+      if (/교직원|직원|교원/.test(r.basis))
+        add('info', `${label} 교직원 지급`, '교직원에게도 지급하는 내용이 있습니다. 지침의 기념품·답례품 지급 대상은 사업 참여 학생으로 되어 있으니, 교직원 지급이 가능한지 혁신지원팀과 확인하세요', G + '37쪽');
+    }
+    if (r.type === 'gift'){
+      add('ok', `${label}`, '사업 관련 물품으로 집행', '담당 부서 판단');
+      procure(a, 'goods', f.vat, sole).forEach(p => add(p[0], `${label} 계약`, p[1], p[2]));
+      add('info', `${label} 수령 확인`, '기념품 수령 서명을 받으세요(참석자 명단 서식의 기념품 수령란 또는 지급대장(물품용))', G + '50쪽, 54~55쪽');
+      // 학생·참여자에게 주는 기념품·경품이면 참여 대가성 안내 (외부 인사 협약 기념품 등은 제외)
+      if (/참여|참가|학생|응답|추첨|경품|참석자/.test(r.content + ' ' + r.basis))
+        add('info', `${label} 참여 대가성`, '행사·프로그램 참여율을 높이려는 단순 참여 대가성 지급(참여자 전원 일괄 지급 등)은 불가합니다. 지급 대상과 조건을 적으세요', G + '38쪽, 79쪽');
+    }
+    if (r.type === 'bundle'){
+      if (!/활동\s*지원(비|금)|운영\s*지원금/.test(r.content))
+        add('ok', `${label}`, '식대·다과비·홍보비·물품구입비를 운영비 한 항목으로 묶어 표기 가능', '학교 실무 기준');
+      else
+        add('info', `${label} 학생 활동 지원`, '학생 활동 지원비는 결과보고 때 참여자 선발·심사와 활동 결과보고 내용을 첨부합니다. 학생 대상은 선지급 후 결과보고 때 정산할 수 있습니다(교직원 선지급 불가)', G + '36쪽');
+      // 묶음 안에 든 경비별 주의점
+      const bb = r.content + ' ' + r.basis;
+      if (/구독|라이선스|라이센스|이용권/.test(bb))
+        add('info', `${label} 구독비`, `구독·라이선스 기간이 사업기간(${f.to || '익년 2월 말'})을 넘으면 그 기간분은 사업비로 낼 수 없습니다. 다년 약정도 안 됩니다`, '대학재정지원사업 삼일회계법인 자료 33쪽');
+      if (/기념품|굿즈|홍보\s*물품|답례품/.test(bb))
+        add('info', `${label} 기념품 제작`, '기념품·홍보물품은 사업 로고 각인이나 스티커로 사업 홍보물품임을 알 수 있게 하고, 수불대장(구매·반출 수량, 수령자 명단·서명)을 남기세요. 사업기간에 필요한 수량만 구입합니다', '대학재정지원사업 삼일회계법인 자료 38쪽');
+      if (/기구|장비|기자재|카메라|조명|마이크|삼각대/.test(bb) && /구입|구매/.test(bb))
+        add('info', `${label} 기구 구입`, '촬영 기구·장비 등 오래 쓰는 물품을 사면 사업 스티커를 붙이고 자산관리대장으로 관리하세요', G + '14쪽, 40쪽');
+      if (/식|다과|간식|음료|도시락|회의비/.test(r.content + r.basis)) add('info', `${label} 식대 포함`, '운영비에 식대·다과비가 들어 있으면 집행할 때도 1인 단가 기준(식사 25,000원 / 다과 10,000원 / 연속 진행 30,000원)을 지켜야 합니다', G + '38쪽');
+      if (!isNaN(a)){
+        const est = f.vat ? a / 1.1 : a;
+        if (est > 5e5) add('info', `${label} 견적`, '같은 업체 구매가 추정가격 50만 원을 넘으면 2인 이상 복수견적이 필요합니다', R + '제9조제1항');
+        if ((f.vat ? a : a * 1.1) > 1.1e7) procure(a, 'goods', f.vat, sole).forEach(p => add(p[0], `${label} 계약`, p[1], p[2]));
+      }
+    }
+    if (r.type === 'goods' && !isNaN(a) && !/활동\s*지원/.test(r.content)) procure(a, 'goods', f.vat, sole).forEach(p => add(p[0], `${label} 계약`, p[1], p[2]));
+    if (r.type === 'construction' && !isNaN(a)) procure(a, 'construction', f.vat, sole).forEach(p => add(p[0], `${label} 계약`, p[1], p[2]));
+    if (r.type === 'service' && !isNaN(a)) procure(a, 'service', f.vat, sole).forEach(p => add(p[0], `${label} 계약`, p[1], p[2]));
+    if (r.type === 'lecture' && !(/원고료/.test(r.content) && !/특강|강사|강연|강의료/.test(r.content))){
+      const B = G + '34~35쪽';
+      const h = num(r.hours), L = LECT[r.grade];
+      if (!/원고료/.test(r.content) && rows.some(o => /원고료/.test(o.content + ' ' + o.basis))) add('err', `${label} 원고료`, '특강 관련 원고료는 강연료와 중복 지급할 수 없습니다', B + ', 38쪽');
+      if (!isNaN(h) && h > 6) add('err', `${label} 시간`, `1회 ${h}시간 — 특강은 1일 최대 6시간이 원칙입니다`, B);
+      if (!L) add('warn', `${label} 유형`, '강사 유형(특별·Ⅰ~Ⅳ·국외)을 ③에서 선택하세요. 1시간 기준 최대: Ⅰ 80만 / Ⅱ 50만 / Ⅲ 30만 / Ⅳ 20만 원, 특별 1회 100만 원', B);
+      else if (L.usd) add('info', `${label} 단가`, `${L.label}은 1회당 최대 ${L.usd.toLocaleString()}달러입니다. 지급일 환율로 원화 금액을 확인하세요`, B);
+      else {
+        if (isNaN(h) && !L.once) add('warn', `${label} 시간`, '1회 강의 시간을 적어 주세요(초과 1시간 단가 판정에 필요)', B);
+        const lim = lectLimit(r.grade, isNaN(h) ? 1 : h);
+        const u = num(r.unit), q = num(r.qty) || 1, a = num(r.amount);
+        const per = !isNaN(u) ? u : (!isNaN(a) ? a / q : NaN);
+        const how = L.once ? '1회당 최대' : `최초 1시간 ${won(L.first)} + 초과 1시간당 ${won(L.extra)}, ${isNaN(h) ? 1 : h}시간 기준 최대`;
+        if (!isNaN(per)){
+          if (per > lim) add('err', `${label} 단가`, `1회 ${won(per)} — ${L.label} ${how} ${won(lim)}을 넘습니다. 유형 근거(강사 이력)를 확인하거나 금액을 조정하세요`, B + ', 74쪽');
+          else add('ok', `${label} 단가`, `1회 ${won(per)} ≤ ${L.label} ${how} ${won(lim)}`, B);
+        }
+      }
+      if (num(r.amount) > 3e6) add('warn', `${label} 계약서`, '특강비가 300만 원을 넘으면 계약서를 작성해야 합니다', G + '34쪽');
+      add('info', `${label} 준비 사항`, '강연자 이력서 또는 경력 증빙서류를 갖추세요(유형 적합성 확인) ▸ 유형은 현직 기준이며 전직이면 한 단계 아래 유형 적용 ▸ 교통비·원고료·강의준비비 등은 강의료에 포함(수도권 외 연구 발표 초빙은 교통비 10만 원 범위 별도) ▸ 강연자 본인 계좌로 기타소득세 원천징수 후 지급 ▸ 공직자 등은 청탁금지법 외부강의 사례금 상한을 넘을 수 없음', B + ', 38쪽');
+    }
+    if (r.type === 'prize'){
+      // 1등 상금 한도(1인 기준): 학과 30만 / 단과대학 50만 / 학교 100만 / 외부 연계 200만 원 (지침 37쪽)
+      const LEVELS = [[/외부\s*연계/, 2e6, '외부 연계 대회'], [/학교\s*단위|전교|양\s*캠퍼스|대학\s*전체|교육혁신원|본부/, 1e6, '학교 단위 대회'],
+                      [/단과\s*대학/, 5e5, '단과대학 단위 대회'], [/학과\s*단위|학과\s*대회/, 3e5, '학과 단위 대회']];
+      const lv = LEVELS.find(([re]) => re.test(T + ' ' + r.basis));
+      const exP = parseExprs(r.basis);
+      const manP = [...String(r.basis).matchAll(/([\d.]+)\s*만\s*원/g)].map(m => Number(m[1]) * 1e4);
+      const top = Math.max(0, ...exP.map(e => e.unit), ...manP);
+      const team = /팀/.test(r.basis + r.content);
+      if (top && lv){
+        if (top <= lv[1]) add('ok', `${label} 한도`, `최고 상금 ${won(top)}${team ? '(팀)' : ''} ≤ ${lv[2]} 1등 1인 최대 ${won(lv[1])}`, G + '37쪽');
+        else if (team) add('warn', `${label} 한도`, `최고 상금 ${won(top)}(팀)이 ${lv[2]} 1등 1인 최대 ${won(lv[1])}를 넘습니다. 팀원 1인당 받는 금액이 한도 안인지 적으세요`, G + '37쪽');
+        else add('err', `${label} 한도`, `최고 상금 ${won(top)}이 ${lv[2]} 1등 1인 최대 ${won(lv[1])}를 넘습니다`, G + '37쪽');
+      } else add('info', `${label} 한도`, `상금 1등 1인 최대: 학과 단위 30만 / 단과대학 50만 / 학교 단위 100만 / 외부 연계 200만 원. 대회 단위를 적어 두면 판정할 수 있습니다${top ? ` (최고 상금 ${won(top)})` : ''}`, G + '37쪽');
+      add('info', `${label} 증빙`, '결과보고 때 심사 내용과 결과, 포상금 지급대장을 함께 제출하세요', G + '36쪽');
+    }
+    if (r.type === 'payment'){
+      // 프로그램(행사) 참여가 확정되면 지급하는 참여비·연구비·활동비는 적정 (학교 실무 기준)
+      add('ok', `${label}`, '프로그램 참여 확정에 따라 지급하는 경비', '학교 실무 기준');
+      // 모집·선발해 운영하며 주는 활동비·연구비는 지급대장이 아니라 결과보고에 명단 첨부(지급대장은 상품·기념품·유가증권용)
+      add('info', `${label} 결과보고`, '결과보고 때 지급 대상 명단과 선발(심사)·활동 결과 자료를 첨부하세요' +
+          (/학생|단원|참여자|멘티/.test(T) ? '. 학생 대상은 선지급 후 결과보고 때 정산할 수 있습니다(교직원 선지급 불가)' : ''), G + '25쪽, 36쪽');
+      if (/최대/.test(r.basis))
+        add('info', `${label} 최대 기준 편성`, '「최대 ○회」처럼 상한으로 편성한 금액이 있습니다. 실제 지급 기준(달성 조건)을 정해 두고, 남는 금액은 집행하지 않습니다');
+    }
+    if (r.type === 'scholarship'){
+      const B = G + '32쪽, 67쪽';
+      // 지급 기준·대상 선정 절차
+      if (/선발|선정|추천|심사|평가/.test(T)) add('ok', `${label} 선정 절차`, '지급 대상 선발(선정) 방식이 적혀 있습니다. 교내 장학금 지급 기준과 선정 절차를 확인할 수 있는 자료를 갖추세요', B);
+      else add('warn', `${label} 선정 절차`, '장학금은 대학 내 지급 기준과 대상 선정 절차를 거쳐 지급해야 합니다. 선발 방식과 기준을 적으세요', B);
+      // 참여 대상 전원 지급형
+      if (/전원|모든\s*(참여자|참가자|학생)|참가자\s*전체/.test(T))
+        add('warn', `${label} 지급 대상`, '참여 대상 전원에게 지급하는 형태의 장학금(단순 사업참여형)은 집행 제한 항목입니다. 선발 기준을 적으세요', B);
+      // 근로성 장학금
+      if (/근로|근무|조교/.test(T))
+        add('info', `${label} 근로성`, '근무를 조건으로 하는 장학금입니다. 근로계약을 체결했다면 근로계약서를, 근무 사실을 확인할 수 있는 자료와 함께 증빙으로 갖추세요', G + '67쪽');
+      add('info', `${label} 지급 전 확인`, '지급 전 학적시스템으로 재학·수료·휴학 등 상태를 확인하세요 ▸ 한국장학재단 학자금 이중지원 범위를 넘지 않는지 확인 ▸ 이 장학금은 국가장학금 Ⅱ유형 교내장학금 실적으로 인정되지 않습니다', B);
+      add('info', `${label} 증빙`, '계좌이체 증빙, 장학금 지급 기준·대상 선정 절차 자료, 수혜자 명단(학번·이름·학과·금액)을 갖추세요', G + '25쪽, 67쪽');
+      // 지급(근무)기간이 사업기간 안인지: '2026년 9월 ~ 2027년 2월'
+      const pm = T.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*[~∼-]\s*(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월/);
+      if (pm && f.from && f.to){
+        const y2 = pm[3] || pm[1];
+        const startYm = `${pm[1]}-${pm[2].padStart(2, '0')}`, endYm = `${y2}-${pm[4].padStart(2, '0')}`;
+        if (startYm < f.from.slice(0, 7) || endYm > f.to.slice(0, 7))
+          add('err', `${label} 기간`, `지급(근무)기간 ${startYm} ~ ${endYm}이 사업기간(${f.from} ~ ${f.to})을 벗어납니다`, G + '75쪽');
+        else add('ok', `${label} 기간`, `지급(근무)기간 ${startYm} ~ ${endYm}이 사업기간 안입니다`);
+      }
+    }
+    if (r.type === 'advice'){
+      // 외부 전문가 활용비(자문료·멘토링): A급 1시간 15만/1일 30만, B급 1시간 10만/1일 25만 원 이하 (지침 34쪽)
+      const B34 = G + '34쪽';
+      const u = num(r.unit), q = num(r.qty) || 1;
+      const per = !isNaN(u) ? u : (!isNaN(a) ? a / q : NaN);                    // 1회(1팀)당 금액
+      const hm = (r.basis + ' ' + T).match(/(?:기본|1회|회당)?\s*(\d+(?:\.\d+)?)\s*시간\s*(?:멘토링|자문|진행|컨설팅)?/);
+      const hrs = r.hours ? num(r.hours) : hm ? Number(hm[1]) : NaN;
+      if (!isNaN(per) && !isNaN(hrs)){
+        // 단기자문은 시간당 단가, 한도는 장기자문 일기본급(1일): A급 30만, B급 25만 원
+        const limA = Math.min(150000 * hrs, 300000), limB = Math.min(100000 * hrs, 250000);
+        if (per <= limB) add('ok', `${label} 단가`, `1회 ${won(per)}(${hrs}시간) ≤ B급 기준 ${won(limB)}(1시간 10만·1일 25만 원)`, B34);
+        else if (per <= limA) add('ok', `${label} 단가`, `1회 ${won(per)}(${hrs}시간) ≤ A급 기준 ${won(limA)}(1시간 15만·1일 30만 원). B급 전문가면 ${won(limB)}까지이니 멘토(자문위원) 이력으로 등급을 확인하세요`, B34);
+        else add('err', `${label} 단가`, `1회 ${won(per)}(${hrs}시간)이 A급 기준 ${won(limA)}(1시간 15만·1일 30만 원)을 넘습니다`, B34 + ', 74쪽');
+      } else add('info', `${label} 단가`, '외부 전문가 활용비 기준: A급 1시간 15만·1일 30만 원 이하, B급 1시간 10만·1일 25만 원 이하. 1회 시간과 단가를 적으면 판정할 수 있습니다', B34);
+      add('info', `${label} 지급 요건`, '우리 대학 교직원에게는 지급할 수 없습니다 ▸ 사업추진계획에 자문료(전문가 활용) 지급 계획이 있어야 합니다 ▸ 자문의견서·멘토링 결과보고서 등 수행을 확인할 근거서류를 갖추세요 ▸ 등급 판단을 위해 이력·경력 증빙을 받으세요 ▸ 300만 원을 넘으면 자문계약서를 작성합니다', B34);
+    }
+  });
+
+  if (rows.some(r => (r.basis || '').startsWith(NO_DETAIL) && r.type !== 'scholarship'))
+    add('info', '산출내역', `세부 산출내역 표가 없어 소요예산(구매·계약금액) 전체를 한 항목으로 점검했습니다. 견적서(붙임)로 ${(f.items || []).length > 1 ? '품목별 ' : ''}금액 근거를 확인하세요`);
+
+  // 예산 줄이 여러 개인 경우: 줄마다 잔액 계산
+  const lines = f.budgetLines || [];
+  if (lines.length > 1){
+    const bad = lines.filter(ln => ln.nums.every(v => v !== '')).filter(ln => { const n = ln.nums.map(num); return n[0] - n[1] !== n[2] || n[2] - n[3] !== n[4]; });
+    if (bad.length) bad.forEach(ln => add('err', '예산 잔액', `${ln.name}: 잔액 계산이 맞지 않습니다`));
+    else add('ok', '예산 잔액(줄별)', `예산 ${lines.length}줄 모두 잔액 계산이 맞습니다 (${lines.map(ln => `${ln.name} ${won(num(ln.nums[3]))}`).join(' + ')})`);
+  }
+  if (f.reqTotal && !isNaN(total) && num(f.reqTotal) !== total)
+    add('err', '신청금액 합계', `예산항목의 신청금액 합계 ${won(num(f.reqTotal))}과 소요예산 ${won(total)}이 다릅니다`);
+
+  // 비교견적
+  const qs = f.quotes || [];
+  if (qs.length){
+    const R9 = R + '제9조제1항';
+    const nv = qs.reduce((a, q) => a + q.vendors.length, 0);
+    if (nv >= 2) add('ok', '비교견적', `${nv}개 업체 견적을 비교했습니다`, R9);
+    else add('warn', '비교견적', '견적 업체가 1곳뿐입니다. 추정가격 50만 원 초과 물품은 2인 이상 복수견적이 필요합니다', R9);
+    const bvn = (f.buyVendor || '').replace(/\s/g, '');
+    const sel = qs.find(q => q.selected) || (bvn && qs.find(q => q.vendors.some(v => bvn.includes(v.replace(/\s/g, '')))));
+    if (sel){
+      if (!isNaN(total) && sel.amount !== total) add('err', '선정 업체 금액', `선정 업체 견적 ${won(sel.amount)}과 구매금액 ${won(total)}이 다릅니다`);
+      else add('ok', '선정 업체 금액', `선정 업체 견적 ${won(sel.amount)} = 구매금액`);
+      const others = qs.filter(q => q !== sel).map(q => q.amount).filter(a => !isNaN(a));
+      if (others.length){
+        const low = Math.min(...others);
+        if (sel.amount > low) add('warn', '최저가 선정', `선정 업체(${won(sel.amount)})보다 낮은 견적(${won(low)})이 있습니다. 최저가가 아닌 업체를 고른 사유를 적으세요`, R9);
+        else add('ok', '최저가 선정', `최저가 업체를 선정했습니다 (다른 견적 ${others.map(won).join(', ')})`);
+      }
+      if (bvn && !sel.vendors.some(v => bvn.includes(v.replace(/\s/g, ''))))
+        add('warn', '구매업체', '본문의 구매업체와 견적표에서 발주로 표시된 업체가 다릅니다');
+    } else add('warn', '선정 업체', '견적표에서 선정(발주) 업체를 찾지 못했습니다. 비고에 발주·선정을 표시하거나 구매업체를 적으세요');
+  }
+
+  // 소프트웨어·솔루션·시스템 도입
+  if (rows.some(r => r.type === 'goods' || r.type === 'service') && /솔루션|소프트웨어|S\/W|라이선스|라이센스|패키지|e-?book|이북/i.test(T)){
+    add('info', '라이선스·유지보수 기간', `라이선스·구독·유지보수 기간이 사업기간(${f.to || '익년 2월 말'})을 넘으면 그 기간에 해당하는 비용은 사업비로 낼 수 없습니다. 견적서의 제공 기간을 확인하세요`, '대학재정지원사업 삼일회계법인 자료 33쪽');
+    if (!/정보\s*(지원)?\s*처에서|정보\s*(지원)?\s*처\s*(주관|요청)/.test(T))
+      add('info', '전산 사양 검토', '전산 관련 구매는 정보(지원)처를 거쳐 사양을 검토받으세요', R + '별지 제1호 서식');
+    add('info', '검수', '납품·설치 후 검사·인수를 하고, 기술이나 전문지식이 필요한 부분은 교내외 전문가에게 검사를 의뢰하세요', R + '제23조');
+  }
+  // 시설·공사·설계 용역
+  const isFacility = rows.some(r => r.type === 'service' || r.type === 'construction')
+    && /시설|공사|설계\s*용역|인테리어|리모델링|개보수|증축|건축|환경\s*개선/.test((f.name || '') + ' ' + T);
+  if (isFacility){
+    if (getBimok(T) === 'env')
+      add('info', '환경개선비 집행 범위', '교육·연구 환경개선비로 건물 신축 투자나 토지 매입비는 집행할 수 없습니다. 기존 건물·건축 설비의 개선·유지보수 경비는 가능합니다', G + '31쪽');
+    // 분야별로 나눈 계약: 각각은 수의계약 한도 안이어도 합계가 한도를 넘으면 분할 계약으로 지적될 수 있음
+    ['service', 'construction'].forEach(kind => {
+      const rs = rows.filter(r => r.type === kind && !isNaN(num(r.amount)));
+      if (rs.length < 2) return;
+      const lim = kind === 'service' ? 2e7 : 2.2e7;
+      const vat = a => f.vat ? a : a * 1.1;
+      const sumK = rs.reduce((s, r) => s + vat(num(r.amount)), 0);
+      if (rs.every(r => vat(num(r.amount)) <= lim) && sumK > lim)
+        add('warn', '분할 계약', `${TYPE_LABEL[kind]} ${rs.length}건이 각각은 수의계약 한도 안이지만 합계(${won(sumK)})가 한도(${won(lim)})를 넘습니다. 분야(목적·내용)가 서로 다른 별건임을 기안문에 밝히세요`, G + '16쪽');
+      else if (sumK <= lim)
+        add('ok', '분야별 계약', `${TYPE_LABEL[kind]} ${rs.length}건 합계(${won(sumK)})도 수의계약 한도 안입니다`, G + '15~16쪽');
+    });
+    if (!(f.quotes || []).length && /각사\s*견적서|견적서\s*각|비교\s*견적|복수\s*견적|견적\s*대비표/.test(T))
+      add('ok', '복수견적', '여러 업체의 견적서(견적 대비표)가 붙임에 있습니다', R + '제9조제1항');
+    if (rows.every(r => isNaN(num(r.amount)) || num(r.amount) <= 3e7) && !/계약서\s*\(?안\)?/.test(T))
+      add('info', '계약서', '계약금액 3천만 원 이하는 계약서 작성을 생략할 수 있지만, 견적서·청구서 등 계약 성립 증빙은 갖춰야 합니다', R + '제20조');
+
+    // 공종별 분리발주 현황
+    const wp = f.workParts;
+    if (wp && wp.parts.length){
+      const sumP = wp.parts.reduce((s, p) => s + p.amount, 0);
+      if (!isNaN(wp.subtotal)) wp.subtotal === sumP ? add('ok', '공종별 소계', `공종 ${wp.parts.length}건 합계 ${won(sumP)} = 소계`)
+                                                   : add('err', '공종별 소계', `공종별 금액 합계는 ${won(sumP)}인데 소계는 ${won(wp.subtotal)}로 적혀 있습니다`);
+      if (!isNaN(wp.budget) && !isNaN(wp.remain)){
+        const base = isNaN(wp.subtotal) ? sumP : wp.subtotal;
+        wp.budget - base === wp.remain ? add('ok', '총 예산 대비 잔액', `${won(wp.budget)} − ${won(base)} = ${won(wp.remain)}`)
+                                       : add('err', '총 예산 대비 잔액', `${won(wp.budget)} − ${won(base)} = ${won(wp.budget - base)}인데 잔액은 ${won(wp.remain)}로 적혀 있습니다`);
+      }
+      const cur = wp.parts.find(p => p.current);
+      if (cur && !isNaN(total)) cur.amount === total ? add('ok', '금회 공종 금액', `공종별 현황의 금회 기안(${cur.name}) 금액 = 계약 예정 금액`)
+                                                     : add('err', '금회 공종 금액', `공종별 현황의 금회 기안(${cur.name}) ${won(cur.amount)}과 계약 예정 금액 ${won(total)}이 다릅니다`);
+      // 같은 건물 공사를 공종별로 나눈 경우: 법령에 따른 분리발주인지
+      const small = wp.parts.filter(p => p.amount <= 2.2e7);
+      if (/분리\s*발주|소방시설공사업법|전기공사업법|정보통신공사업법/.test(T)){
+        add('ok', '분리발주', `법령에 따른 공종별 분리발주로 적혀 있습니다(${wp.parts.map(p => p.name).join(', ')})`, G + '16쪽');
+        wp.parts.filter(p => p.amount > 2.2e7).forEach(p => /낙찰|입찰/.test(p.note)
+          ? add('ok', `${p.name} 계약방법`, `수의계약 한도를 넘는 공종(${won(p.amount)})이며 입찰(낙찰)로 진행한다고 적혀 있습니다`, G + '15쪽')
+          : add('warn', `${p.name} 계약방법`, `${won(p.amount)}은 공사 수의계약 한도(2,200만 원)를 넘습니다. 입찰로 진행하는지 적으세요`, G + '15쪽'));
+      }
+      else if (small.length >= 2 && small.reduce((s, p) => s + p.amount, 0) > 2.2e7)
+        add('warn', '분할 계약', `수의계약 한도 이하 공종 ${small.length}건의 합계(${won(small.reduce((s, p) => s + p.amount, 0))})가 한도를 넘습니다. 공종별로 나눈 근거(법령상 분리발주 등)를 적으세요`, G + '16쪽');
+    }
+
+    // 하자보수보증: 계약금액의 2~10%, 기간 1~10년
+    const hm = T.match(/하자\s*보수\s*보증[^\n]*?(\d+(?:\.\d+)?)\s*%/);
+    if (hm){
+      const p = Number(hm[1]); const ym = T.match(/하자\s*보수\s*보증[^\n]*?(\d+)\s*년/);
+      const yrs = ym ? Number(ym[1]) : NaN;
+      if (p < 2 || p > 10) add('warn', '하자보수보증', `하자보수보증금 ${p}%는 기준(계약금액의 2~10%)을 벗어납니다`, R + '제25조제1항');
+      else add('ok', '하자보수보증', `하자보수보증금 ${p}%${isNaN(yrs) ? '' : `, 하자담보 ${yrs}년`} (기준 2~10%, 1~10년)`, R + '제25조');
+      if (!isNaN(yrs) && (yrs < 1 || yrs > 10)) add('warn', '하자담보 기간', `하자담보 기간 ${yrs}년은 기준(1~10년)을 벗어납니다`, R + '제25조제2항');
+    }
+    // 기성금·잔금 분할 지급
+    if (/기성|잔금|분할\s*지급/.test(T))
+      add('info', '대금 지급', '기성·준공 대가는 검사를 마친 뒤 계약상대자의 청구를 받은 날부터 20일 이내 지급이 원칙입니다. 마지막 지급(잔금)까지 사업기간 안에 이뤄져야 합니다', R + '제24조 / ' + G + '15쪽');
+    // 후속 공사 예정액(설계 용역 기안의 '공사비 기준')
+    const cm = T.match(/공사비\s*(?:기준|예정액|추정액)?\s*[:：]?\s*금?\s*([\d,]{6,})\s*원/);
+    if (cm){
+      const c = num(cm[1]);
+      const how = c > 8.8e7 ? '일반시설공사 기준 나라장터 입찰 대상(전문공사 1억1천만·건설공사 2억2천만 원 초과 시 나라장터)'
+                : c > 3.3e7 ? '입찰 대상' : c > 2.2e7 ? '소액수의 견적(3일 공고) 대상' : '일반 수의계약 구간';
+      add('info', '후속 공사', `설계에 따른 공사(공사비 기준 ${won(c)})는 ${how}입니다. 공사 착공·준공과 대금 지급이 사업기간(${f.to || '익년 2월 말'}) 안에 끝나도록 일정을 미리 잡으세요`, G + '15쪽');
+    }
+    if (/공사/.test(T)) add('info', '인허가', '인·허가가 필요한 시설공사는 서울캠퍼스 건설기획팀(글로벌캠퍼스 기획건설팀)이 담당합니다', R + '제4조제1호');
+  }
+
+  // 오픈·완료 예정일이 사업기간 안인지: '2027. 1. 오픈 예정'
+  // '2027. 08. : 전체 공사 준공'처럼 날짜와 단어 사이에 글자가 있어도 읽음(같은 줄 20자 이내). 여러 개면 가장 늦은 날짜
+  const ops = [...T.matchAll(/(\d{4})\s*[.년]\s*(\d{1,2})\s*[.월]?\s*(?:\d{1,2}\s*[.일]?\s*)?[^\n\d~]{0,20}?(오픈|개통|구축\s*완료|완공|완료|납품|준공)/g)];
+  const op = ops.sort((a, b) => (`${b[1]}-${b[2].padStart(2, '0')}`).localeCompare(`${a[1]}-${a[2].padStart(2, '0')}`))[0];
+  if (op && f.to){
+    const ym = `${op[1]}-${op[2].padStart(2, '0')}`;
+    if (ym > f.to.slice(0, 7)) add('err', '완료 일정', `${op[3]} 예정(${ym})이 사업기간 종료(${f.to})보다 늦습니다. 계약기간과 대금 지급은 사업기간 안이어야 합니다. 불가피하면 예산 이월(한국연구재단 승인 필요)을 혁신지원팀과 미리 협의하세요`, G + '14쪽, 15쪽');
+    else add('ok', '완료 일정', `${op[3]} 예정(${ym})이 사업기간 안입니다. 입찰 지연·유찰에 대비해 일정 여유를 확인하세요`, G + '15쪽');
+  }
+
+  // 기자재 구입
+  const itemNames = (f.items || []).map(t => t.name).join(' ');
+  const EQUIP = /기자재|PC|컴퓨터|노트북|모니터|복합기|프린터|장비|서버|태블릿|스캐너|카메라|프로젝터|측정기|분석기|현미경|원심분리기|계측기|오실로스코프|분광|센서|기기|장치/i;
+  const bimok = getBimok(T);
+  // 기자재 활용계획서·관리대장, 3천만 원 이상 심의는 비목이 '실험·실습 기자재 구입·운영비'일 때만 (지침 25쪽 표)
+  const isEquip = rows.some(r => r.type === 'goods') && (bimok === 'equip' || EQUIP.test(itemNames + ' ' + rows.map(r => r.content + ' ' + r.basis).join(' ')));
+  if (isEquip){
+    if (bimok === 'equip'){
+      if (/활용\s*계획서/.test(T)) add('ok', '기자재 활용계획서', '기자재 활용계획서가 관련 근거로 적혀 있습니다', G + '25쪽, 56쪽');
+      else add('warn', '기자재 활용계획서', '비목이 실험·실습 기자재 구입·운영비이므로 기자재 활용계획서([서식5])를 갖추세요', G + '25쪽, 56쪽');
+      if (!isNaN(total) && total >= 3e7) add('info', '기자재 심의·등록', '건당 3천만 원 이상 실험·실습장비 및 기자재는 대학 자체 심의 후 한국연구재단 사전승인 대상이며, 취득 후 30일 이내 ZEUS 장비등록서비스에 등록해야 합니다', G + '31쪽, 56쪽');
+    } else if (!bimok)
+      add('info', '기자재 활용계획서', '비목을 찾지 못했습니다. 비목이 실험·실습 기자재 구입·운영비라면 기자재 활용계획서가 필요합니다(교육·연구 환경개선비 등 다른 비목은 해당 없음)', G + '25쪽');
+    add('info', '기자재 관리', '사업비로 구입한 기자재에는 사업 스티커를 붙이고 자산관리대장으로 관리하세요(위치가 바뀌면 총괄지원팀 관재파트에 통보)', G + '14쪽');
+  }
+  // 결과보고 때 비목별로 추가하는 첨부자료 (지침 25쪽 표)
+  const ATT = {equip:'기자재 활용계획서, 기자재 관리대장, 사진자료', env:'검수조서(공사서류), 사진자료'};
+  if (ATT[bimok]) add('info', '결과보고 첨부(비목별)', `비목이 ${BIMOK_LABEL[bimok]}이므로 결과보고 때 ${ATT[bimok]}를 첨부합니다`, G + '25쪽');
+  // 계약기간: '진행업체/개발기간: 업체 / 4개월 이내'처럼 업체명이 섞여도 기간 부분만
+  const perLine = T.split('\n').find(l => /(개발|계약|용역|과업|수행|공사)\s*기간/.test(l)) || '';
+  const perM = perLine.match(/\d{4}\s*\.\s*\d{1,2}\s*\.\s*\d{1,2}\.?\s*[~∼-]\s*(\d{4}\s*\.\s*)?\d{1,2}\s*\.\s*\d{1,2}\.?|(계약\s*(체결)?|착공)\s*일로?부터\s*\d+\s*(개월|일)\s*(간|이내)?|\d+\s*(개월|주|일)\s*(이내)?/);
+  const per = perM ? [null, perM[0]] : null;
+  if (per && /용역|계약|개발|구축|공사/.test(T))
+    add('info', '계약기간', `계약기간(${per[1].trim()})과 대금 지급이 사업기간(${f.to || '익년 2월 말'}) 안에 끝나야 합니다. 1·2월로 넘어가면 다음 사업연도 기간과 겹칩니다`, G + '15쪽');
+  if (/현수막|배너/.test(allText)) add('info', '현수막·배너', '현수막에 대학혁신지원사업의 일환으로 진행하는 행사임을 알 수 있게 명시해 주세요', G + '14쪽');
+  (f.attach || []).forEach(a => add('info', '첨부 확인', `본문에 '${a}' 첨부가 적혀 있습니다. 첨부파일을 확인하세요`));
+  // 설문조사 + 경품(기프티콘 등): 발송을 위해 연락처를 받으면 개인정보 수집·이용 동의 필요
+  if (/설문|수요\s*조사|만족도\s*조사|실태\s*조사/.test(T) && rows.some(r => r.type === 'voucher' || r.type === 'gift'))
+    add('info', '설문 개인정보', '경품 발송을 위해 응답자의 이름·휴대폰 번호 등을 받는다면 설문에 개인정보 수집·이용 동의 문항(수집 항목, 목적, 보유기간)을 넣고, 발송 후에는 파기하세요', '개인정보 보호법 제15조');
+  if (/\[비밀번호 삭제\]/.test(T))
+    add('info', '첨부 비밀번호', '본문에 첨부파일 비밀번호가 적혀 있어 마스킹했습니다. 개인정보가 담긴 파일의 비밀번호는 본문 대신 별도 경로로 전달하는 것을 권장합니다', '개인정보 보호 권고');
+  return R_;
+}
+
+/* ───────── AI 추출 (Claude Messages API) ───────── */
+const ROW_TYPES = Object.keys(TYPE_LABEL);
+const AI_SCHEMA = {
+  type:'object', additionalProperties:false,
+  required:['name','date','dow','named','extra','meal','rows','sum','total','totalKo','budget','attach','notes'],
+  properties:{
+    name:{type:'string'}, date:{type:'string'}, dow:{type:'string'},
+    named:{type:'integer'}, extra:{type:'boolean'}, meal:{type:'boolean'},
+    rows:{type:'array', items:{
+      type:'object', additionalProperties:false,
+      required:['content','type','basis','unit','qty','amount','grade','hours','grade_reason'],
+      properties:{
+        content:{type:'string'}, type:{type:'string', enum:ROW_TYPES}, basis:{type:'string'},
+        unit:{type:'string'}, qty:{type:'string'}, amount:{type:'string'},
+        grade:{type:'string', enum:['', ...Object.keys(LECT)]}, hours:{type:'string'}, grade_reason:{type:'string'}
+      }}},
+    sum:{type:'string'}, total:{type:'string'}, totalKo:{type:'string'},
+    budget:{type:'object', additionalProperties:false, required:['allocated','claimed','before','request','after'],
+      properties:{allocated:{type:'string'}, claimed:{type:'string'}, before:{type:'string'}, request:{type:'string'}, after:{type:'string'}}},
+    attach:{type:'array', items:{type:'string'}},
+    notes:{type:'string'}
+  }
+};
+
+const AI_SYSTEM = `너는 한국외국어대학교 대학혁신지원사업 시행기안(원안기안) 본문에서 사전점검에 쓸 항목을 뽑는 추출기다.
+판정이나 의견은 쓰지 말고, 기안문에 적힌 값을 정해진 칸에 옮긴다. 판정은 별도 프로그램이 한다.
+사람 이름은 이미 [A], [B] 같은 기호로 가려져 있다. 이름을 복원하거나 추측하지 않는다.
+
+[공통 규칙]
+- 기안문에 없는 값은 빈 문자열("")로 둔다. 숫자 칸은 쉼표·'원' 없이 숫자만 적는다(예: 1650000).
+- 표가 한 칸씩 줄바꿈으로 풀려 있거나 병합 셀 때문에 칸이 밀려 있을 수 있다. 열 제목과 연번을 보고 행을 다시 맞춘다.
+
+[칸별 설명]
+- name: 행사명 또는 사업명
+- date: 행사(사업) 시행일, YYYY-MM-DD. 기간이면 시작일
+- dow: 기안문에 적힌 요일 한 글자(예: 화). 적혀 있지 않으면 ""
+- named: 참석 대상 명단에 개별 인물로 적힌 사람 수(기호나 직위 하나당 1명)
+- extra: 명단에 "관계자", "등", "OO명 내외"처럼 인원을 특정하지 않은 표현이 있으면 true
+- meal: 식순이나 일정에 식사(오찬·만찬·점심·저녁·식사)가 있으면 true. 다과·차담만 있으면 false
+- rows: 예산내역·산출내역·세부내역 표의 각 행(소계·합계·계·'…' 행 제외)
+  - 금액 칸이 없고 세부내역에 "= 금액"이 있으면 그 값(한 행에 여러 개면 합)을 amount로 적는다
+  - 표에 (단위: 천원) 같은 표기가 있으면 원 단위로 환산해 적는다(예산항목 표도 같음)
+  - 「구분 | 계약금액 | 계약자 | 비고」처럼 분야별 계약금액 표면 분야마다 한 행(content=구분, amount=계약금액, basis=계약자). 사업명이 '○○ 용역'이면 type은 service, '○○ 공사'면 construction
+  - 「연번 | 내용 | 금액 | 산출근거」처럼 금액이 근거보다 앞에 있고 한 행에 금액·근거가 여러 번 나오면 금액을 합해 amount로, basis는 "[금액원] 근거 / [금액원] 근거" 형태로
+  - '5만원권*5명'의 만원권·천원권은 원 단위로 읽는다
+  - 장학금 기안처럼 '1인당 금액'과 '선발 인원'만 있으면 행 하나로: unit=1인당 금액(원 단위, 400만원→4000000), qty=인원, amount=총액
+  - 계약·구매 건처럼 산출내역 표가 없고 소요예산(구매금액·계약금액) 총액만 있으면, 사업명을 content로, 총액을 amount로 하는 행 하나만 만든다(basis는 "세부 산출내역 없음(소요예산 전체)")
+  - type: meal(식대·다과), gift(기념품·답례품·홍보물품), voucher(상품권·기프티콘 등 유가증권), bundle(운영비처럼 여러 경비를 한 항목으로 묶은 것), lecture(강사료·특강료·강연료·강의료·원고료), advice(자문료·멘토링·외부 전문가 활용비), payment(지급비·연구비·활동비·수당·사례비처럼 개인에게 주는 돈), prize(대회·공모전 상금·포상금), scholarship(장학금), service(용역·대행·임차·대관, 시스템 개발·기능 추가, 설계 용역·감리), construction(시설공사·리모델링·보수·인테리어 공사), goods(그 밖의 물품. 소프트웨어·솔루션·라이선스를 도입·구입하는 것도 물품)
+  - 표에 금액 열이 따로 없고 '세부 내역' 칸에 "항목명 / 식 또는 금액"이 번갈아 나오면 항목마다 한 행으로 나눈다. 연번·예산 사업명([혁신]…)·사업코드는 행 내용이 아니다
+  - basis: 산출근거 칸 내용 그대로(비고가 있으면 괄호로 덧붙임)
+  - unit: 1인·1회·1개당 단가, qty: 인원·수량·횟수. 산출근거에 있을 때만 적는다
+  - amount: 그 행의 금액
+  - grade, hours, grade_reason: 강사료(lecture) 행만. 나머지 행은 ""
+    - hours: 1회 강의 시간(시간 단위 숫자)
+    - grade: 기안문에 유형이 적혀 있으면 그대로 옮긴다. 없으면 강사의 현직 직위·경력 설명으로 아래 기준표에서 고르고, grade_reason에 어떤 설명을 근거로 골랐는지 한 문장으로 적는다. 판단할 설명이 없으면 grade와 grade_reason 모두 ""
+      S 특별: 국내외 해당분야 최고권위자로 총장이 특별히 인정하는 자
+      1 Ⅰ유형: 장관급 이상, 국회의원·정당대표·광역단체장, 상장기업 대표이사·국책(대형민간)연구기관장, 언론사 대표, 타 대학 총장
+      2 Ⅱ유형: 차관급 이상·기초단체장급, 상장기업 등기임원·중소기업대표·중소연구기관장, 논설위원·편집장, 저명학자, 재단 및 국공립 문화예술기관장·저명 인사
+      3 Ⅲ유형: 서기관급 이상, 상장기업 미등기 임원급 이상·연구기관 수석연구원급 이상, 언론 부장급 이상, 타 대학 전임·비전임 교직원·초중고 교장·교감, 변호사·회계사·노무사·세무사 등 전문자격사·시민단체장·해당분야 20년 이상 전문가
+      4 Ⅳ유형: 사무관급 이하, 상장기업 부장 이하·연구기관 선임연구원급 이하, 언론 과장급 이하, 초중고 교사·해당분야 박사학위 소지 전문가 이하, Ⅲ유형 미만 해당자
+      F1 국외Ⅰ: 노벨상 수상자 수준 석학, 글로벌 기업 CEO / F2 국외Ⅱ: 대학 총장, 저명 교수 및 학자, 상장기업 대표 / F3 국외Ⅲ: 일반 교수급 및 학자, 상장기업 임원
+      전직이면 한 단계 아래 유형을 고른다.
+- sum: 예산내역 합계 / total: 소요예산 금액 / totalKo: 한글 금액 표기 그대로(예: 금일백육십오만원)
+- budget: 예산항목 표의 배정액(allocated), 기 청구액(claimed), 청구 전 잔액(before), 본건 청구액(request), 청구 후 잔액(after). 예산 줄(사업코드)이 여러 개면 열마다 합계를 적는다
+- attach: 붙임 목록의 문서 이름(번호·부수 제외)
+- notes: 읽기 애매했던 부분이 있으면 한두 문장, 없으면 ""`;
+
+function buildAiRequest(model, maskedText){
+  const body = {
+    model, max_tokens:16000,
+    system:AI_SYSTEM,
+    messages:[{role:'user', content:`다음 시행기안 본문에서 항목을 추출해 주세요.\n\n<기안문>\n${maskedText}\n</기안문>`}],
+    output_config:{effort:'low', format:{type:'json_schema', schema:AI_SCHEMA}}
+  };
+  const headers = {'content-type':'application/json', 'anthropic-version':'2026-10-21', 'anthropic-dangerous-direct-browser-access':'true'};
+  // 안전 분류기가 거절하면 서버에서 다른 모델로 다시 시도 (Haiku는 미지원)
+  if (model !== 'claude-haiku-5-5'){ body.fallbacks = 'default'; headers['anthropic-beta'] = 'server-side-fallback-2026-07-01'; }
+  return {body, headers};
+}
+
+function parseAiResponse(data){
+  if (data.stop_reason === 'refusal') throw new Error('AI가 이 요청을 처리하지 않았습니다(거절). 규칙 추출 결과로 진행합니다.');
+  if (data.stop_reason === 'max_tokens') throw new Error('AI 응답이 길이 제한에 걸려 잘렸습니다. 규칙 추출 결과로 진행합니다.');
+  const block = (data.content || []).find(b => b.type === 'text');
+  if (!block) throw new Error('AI 응답에 결과가 없습니다.');
+  const a = JSON.parse(block.text);
+  const b = a.budget || {};
+  return {name:a.name, date:a.date, dow:a.dow, named:a.named, extra:a.extra, meal:a.meal,
+          rows:a.rows || [], sum:a.sum, total:a.total, totalKo:a.totalKo,
+          budget:[b.allocated, b.claimed, b.before, b.request, b.after], attach:a.attach || [], notes:a.notes || ''};
+}
+
+/* HyperCLOVA X (CLOVA Studio Chat Completions v3, Structured Outputs: HCX-007 전용) */
+function stripForClova(s){
+  // CLOVA Studio 문서에 없는 additionalProperties는 빼고 보냄
+  if (Array.isArray(s)) return s.map(stripForClova);
+  if (s && typeof s === 'object'){
+    const o = {};
+    for (const [k, v] of Object.entries(s)) if (k !== 'additionalProperties') o[k] = stripForClova(v);
+    return o;
+  }
+  return s;
+}
+function buildClovaRequest(maskedText){
+  return {
+    messages:[
+      {role:'system', content:AI_SYSTEM},
+      {role:'user', content:`다음 시행기안 본문에서 항목을 추출해 주세요.\n\n<기안문>\n${maskedText}\n</기안문>`}
+    ],
+    maxCompletionTokens:8192,
+    temperature:0.1,
+    thinking:{effort:'none'},            // 구조화 출력은 추론(thinking)과 함께 못 씀
+    responseFormat:{type:'json', schema:stripForClova(AI_SCHEMA)}
+  };
+}
+function parseClovaResponse(data){
+  const st = data.status || {};
+  if (st.code && st.code !== '20000') throw new Error(`CLOVA Studio 오류(${st.code}: ${st.message || ''}) 규칙 추출 결과로 진행합니다.`);
+  const r = data.result || {};
+  if (r.finishReason === 'length') throw new Error('AI 응답이 길이 제한에 걸려 잘렸습니다. 규칙 추출 결과로 진행합니다.');
+  const text = r.message && r.message.content;
+  if (!text) throw new Error('AI 응답에 결과가 없습니다.');
+  return parseAiResponse({stop_reason:'end_turn', content:[{type:'text', text}]});
+}
+
+// 규칙 결과와 AI 결과 합치기: AI 값을 우선 쓰고, 둘 다 있는데 다르면 conflict로 표시
+function mergeExtract(rule, ai){
+  const norm = v => String(v == null ? '' : v).replace(/[\s,원]/g, '');
+  const src = {}, out = {...rule};
+  const pick = (key, rv, av, setter) => {
+    const r = norm(rv), x = norm(av);
+    if (x === '' || x === 'undefined'){ src[key] = r ? 'rule' : ''; return; }
+    setter(av);
+    if (!r) src[key] = 'ai';
+    else if (r === x) src[key] = 'both';
+    else src[key] = {conflict:true, rule:rv};
+  };
+  ['name','date','dow','sum','total','totalKo'].forEach(k => pick(k, rule[k], ai[k], v => out[k] = String(v)));
+  pick('named', rule.named || '', ai.named || '', v => out.named = Number(v));
+  ['extra','meal'].forEach(k => {
+    out[k] = !!ai[k];
+    src[k] = (!!rule[k] === !!ai[k]) ? 'both' : !rule[k] ? 'ai' : {conflict:true, rule:'있음'};   // 규칙이 못 찾은 것(false)은 불일치로 보지 않음
+  });
+  out.budget = rule.budget.slice();
+  for (let i = 0; i < 5; i++) pick('b' + i, rule.budget[i], ai.budget[i], v => out.budget[i] = String(v));
+  pick('attach', rule.attach.join(', '), (ai.attach || []).join(', '), () => out.attach = ai.attach);
+  if (ai.rows && ai.rows.length){
+    out.rows = ai.rows;
+    const ra = rule.rows.map(r => norm(r.amount)).join('|'), aa = ai.rows.map(r => norm(r.amount)).join('|');
+    src.rows = !rule.rows.length ? 'ai' : ra === aa ? 'both' : {conflict:true, rule:rule.rows.map(r => `${r.content} ${r.amount}`).join(' / ')};
+  } else src.rows = rule.rows.length ? 'rule' : '';
+  out.notes = ai.notes || '';
+  return {out, src};
+}
+
+if (typeof module !== 'undefined') module.exports = {maskText, extract, runChecks, parseKoreanAmount, buildAiRequest, parseAiResponse, mergeExtract, AI_SCHEMA, buildClovaRequest, parseClovaResponse, parseBudgetTable, parseBudgetItems, parseExprs, parseAttachments};
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const SAMPLE = `1. 관련: 2025~2027년 대학혁신지원사업 사업계획(기초학문 및 교양교육 활성화)
+2. 위와 관련, 한국예술종합학교와의 공동 교육과정 운영 확대를 위한 업무 협약체결식을 아래와 같이 실시하고자 하오니 결재하여 주시기 바랍니다.
+
+  가. 행사내용: 체계적 공동 교육과정 운영 확대를 위한 한국예술종합학교 업무협약식(MOU)
+  나. 일시 및 장소: 2026.11.17.(화) 10:30, 서울캠퍼스 본관 203호 이덕선 회의실
+  다. 참석대상(일부 변동 가능)
+    1) 우리대학: 홍길동 총장, 김하늘 서울캠퍼스 부총장, 이바다 교무처장, 박가람 교육혁신원장, 최나래 교양교육센터장, 정보람 혁신지원팀장 및 교육혁신원 관계자
+    2) 한예종: 강다솜 총장, 윤새봄 교무처장, 서한결 기획처장, 임푸른 예술교양학부 주임교수, 오누리 교무과장
+  라. 식순(안)
+
+연번
+시간
+내용
+비고
+1
+10:00~10:30
+총장 차담회
+총장실
+2
+10:30~10:40
+협약식 개회 및 참석자 소개
+본관 203호
+이덕선 회의실
+3
+10:40~10:50
+대학별 총장 인사말씀
+4
+10:50~11:00
+협약서 서명
+5
+11:00~11:20
+기념사진 촬영 및 기념품 교환
+6
+11:20
+폐회
+
+  마. 소요예산: 1,650,000원(금일백육십오만원)
+    2) 예산내역
+
+연번
+내용
+산출근거
+금액(원)
+비고
+1
+기념품비
+한예종 총장 및 대학 관계자 기념품
+500,000
+
+2
+식대 및 다과비
+30,000원 * 15명
+450,000
+실비정산
+3
+운영비
+현수막 제작, 주차권, 진행물품 구입 등
+700,000
+실비정산
+합계
+1,650,000
+
+    3) 예산항목
+
+사업내용 (사업코드)
+계정목
+추경이전 배정액
+기 청구액
+청구 전 예산잔액
+본건 청구액
+청구 후예산잔액
+[혁신]예시사업
+A000-000-000000
+OO비
+50,000,000
+2,000,000
+48,000,000
+1,650,000
+46,350,000
+
+붙임  1. 업무협약기념(MOU) 보고자료 1부.
+      2. 기념품 견적서 1부.  끝.`;
+
+let masked = null, extracted = null, results = [];
+
+function stepOn(n, quiet){
+  for (let i = 1; i <= 4; i++){
+    $('st' + i).className = i < n ? 'done' : i === n ? 'on' : '';
+    $('c' + i).classList.toggle('hidden', i > n);
+  }
+  if (!quiet) $('c' + n).scrollIntoView({behavior:'smooth', block:'start'});
+}
+function opts(){
+  return {name:$('optName').checked, nameMode:$('optNameMode').value, phone:$('optPhone').checked,
+          email:$('optEmail').checked, sign:$('optSign').checked,
+          exceptions:$('optExcept').value.split('\n').map(s => s.trim()).filter(Boolean)};
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function doMask(quiet){
+  const src = $('src').value;
+  if (!src.trim()){ alert('기안문 본문을 붙여넣어 주세요.'); return false; }
+  masked = maskText(src, opts());
+  const reps = [...new Set(masked.found.map(f => f.repl))].filter(r => r !== '(줄 삭제)').sort((a, b) => b.length - a.length);
+  let html = esc(masked.text);
+  reps.forEach(r => { html = html.split(esc(r)).join('<mark>' + esc(r) + '</mark>'); });
+  $('maskedView').innerHTML = html;
+  if (!masked.found.length) $('maskList').innerHTML = '<p class="note">마스킹할 개인정보를 찾지 못했습니다. 본문을 한 번 더 확인해 주세요.</p>';
+  else {
+    $('maskList').innerHTML = '<table><thead><tr><th>유형</th><th>원문</th><th>처리</th><th></th></tr></thead><tbody>' +
+      masked.found.map((f, i) => `<tr><td>${esc(f.type)}</td><td>${esc(f.orig)}</td><td>${esc(f.repl)}</td><td>${f.type === '실명' ? `<button class="small" data-ex="${i}">예외로 두기</button>` : ''}</td></tr>`).join('') +
+      `</tbody></table><p class="note">총 ${masked.found.length}건 처리. 원문은 이 화면에만 있고 저장·전송되지 않습니다.</p>`;
+    $('maskList').querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
+      const f = masked.found[+b.dataset.ex];
+      $('optExcept').value = ($('optExcept').value.trim() + '\n' + f.orig).trim();
+      doMask();
+    });
+  }
+  stepOn(2, quiet === true);
+  return true;
+}
+
+function rowHtml(r){
+  const types = Object.entries(TYPE_LABEL).map(([k, v]) => `<option value="${k}"${k === r.type ? ' selected' : ''}>${v}</option>`).join('');
+  return `<tr><td><input data-k="content" value="${esc(r.content || '')}"></td><td><select data-k="type">${types}</select></td>
+    <td><input data-k="basis" value="${esc(r.basis || '')}"></td><td><input data-k="unit" value="${esc(r.unit || '')}"></td>
+    <td><input data-k="qty" value="${esc(r.qty || '')}"></td><td><input data-k="amount" value="${esc(r.amount || '')}"></td>
+    <td><select data-k="grade"><option value="">(유형 선택)</option>${Object.entries(LECT).map(([k, v]) => `<option value="${k}"${k === r.grade ? ' selected' : ''}>${v.label}</option>`).join('')}</select>
+        <input data-k="hours" placeholder="강의 시간(1회)" value="${esc(r.hours || '')}" style="margin-top:3px">
+        ${r.grade_reason ? `<div class="note" style="font-size:11.5px;margin-top:3px">AI 추정: ${esc(r.grade_reason)}</div>` : ''}</td>
+    <td><button class="small" data-del>삭제</button></td></tr>`;
+}
+function bindRowDel(){ $('tblRows').querySelectorAll('[data-del]').forEach(b => b.onclick = () => b.closest('tr').remove()); }
+
+const FIELD_IDS = {name:'fName', date:'fDate', dow:'fDow', named:'fNamed', extra:'fExtra', meal:'fMeal',
+  sum:'fSum', total:'fTotal', totalKo:'fTotalKo', b0:'fB1', b1:'fB2', b2:'fB3', b3:'fB4', b4:'fB5', attach:'fAttach', rows:'tblRows'};
+
+function setStatus(id, cls, msg){ const el = $(id); el.className = 'status ' + cls; el.textContent = msg; }
+
+const isClova = () => $('aiModel').value.startsWith('HCX');
+
+async function callClova(text, key){
+  if (location.protocol === 'file:') throw new Error('HyperCLOVA X는 「실행(HyperCLOVA X 사용 시).bat」으로 연 화면에서만 쓸 수 있습니다. 규칙 추출 결과로 진행합니다.');
+  let res;
+  try {
+    res = await fetch('/clova/' + $('aiModel').value, {method:'POST',
+      headers:{'content-type':'application/json', 'authorization':'Bearer ' + key}, body:JSON.stringify(buildClovaRequest(text))});
+  } catch (e){ throw new Error('실행기에 연결하지 못했습니다. 실행기 창이 열려 있는지 확인하세요. 규칙 추출 결과로 진행합니다.'); }
+  if (res.status === 404 || res.status === 501) throw new Error('실행기(precheck_server.py)로 연 화면이 아닙니다. 「실행(HyperCLOVA X 사용 시).bat」으로 여세요. 규칙 추출 결과로 진행합니다.');
+  let data = {}; try { data = await res.json(); } catch (e) {}
+  if (!res.ok){
+    const m = (data.status && data.status.message) || '';
+    const hint = res.status === 401 ? 'CLOVA Studio API 키가 올바르지 않습니다.' : res.status === 429 ? '요청 한도를 넘었습니다. 잠시 뒤 다시 시도하세요.'
+               : res.status >= 500 ? 'CLOVA Studio 서버 또는 연결 오류입니다.' : '요청 오류입니다.';
+    throw new Error(`${hint} (HTTP ${res.status}${m ? ': ' + m : ''}) 규칙 추출 결과로 진행합니다.`);
+  }
+  return parseClovaResponse(data);
+}
+
+async function callAi(text){
+  const key = $('aiKey').value.trim();
+  if (!key) throw new Error('API 키가 없어 규칙 추출만 사용했습니다. ①의 AI 설정에서 키를 입력하세요.');
+  if (isClova()) return callClova(text, key);
+  const {body, headers} = buildAiRequest($('aiModel').value, text);
+  headers['x-api-key'] = key;
+  let res;
+  try { res = await fetch('https://api.anthropic.com/v1/messages', {method:'POST', headers, body:JSON.stringify(body)}); }
+  catch (e){ throw new Error('API에 연결하지 못했습니다(네트워크·방화벽 확인). 규칙 추출 결과로 진행합니다.'); }
+  if (!res.ok){
+    let msg = ''; try { msg = (await res.json()).error.message; } catch (e) {}
+    const hint = res.status === 401 ? 'API 키가 올바르지 않습니다.' : res.status === 429 ? '요청 한도를 넘었습니다. 잠시 뒤 다시 시도하세요.'
+               : res.status >= 500 ? 'API 서버 오류입니다. 잠시 뒤 다시 시도하세요.' : '요청 오류입니다.';
+    throw new Error(`${hint} (HTTP ${res.status}${msg ? ': ' + msg : ''}) 규칙 추출 결과로 진행합니다.`);
+  }
+  return parseAiResponse(await res.json());
+}
+
+function markSrc(src){
+  Object.entries(FIELD_IDS).forEach(([k, id]) => {
+    let el = $(id); if (!el) return;
+    if (el.type === 'checkbox') el = el.closest('label');
+    el.classList.remove('src-ai', 'src-conflict'); el.removeAttribute('title');
+    const s = src[k];
+    if (s === 'ai') el.classList.add('src-ai');
+    else if (s && s.conflict){ el.classList.add('src-conflict'); el.title = '규칙 추출 값: ' + (s.rule === '' ? '(없음)' : s.rule); }
+  });
+}
+
+function fillForm(e){
+  $('fName').value = e.name; $('fDate').value = e.date; $('fDow').value = e.dow;
+  $('fNamed').value = e.named; $('fExtra').checked = e.extra; $('fMeal').checked = e.meal;
+  $('tblRows').querySelector('tbody').innerHTML = e.rows.map(rowHtml).join('');
+  bindRowDel();
+  $('fSum').value = e.sum; $('fTotal').value = e.total; $('fTotalKo').value = e.totalKo;
+  e.budget.forEach((v, i) => $('fB' + (i + 1)).value = v == null ? '' : v);
+  $('fAttach').value = (e.attach || []).join(', ');
+  if (typeof e.vat === 'boolean') $('fVat').checked = e.vat;
+  const bl = e.budgetLines || [];
+  $('budgetInfo').textContent = bl.length > 1 ? `· 예산 ${bl.length}줄(${bl.map(x => x.name).join(', ')})의 합계입니다. 줄별 계산은 점검 결과에서 확인` : '';
+  $('rowsInfo').textContent = e.singleRow ? '· 세부 산출내역이 없어 소요예산(구매·계약금액) 전체를 한 행으로 넣었습니다(계약·구매 건 등)'
+    : e.rows.length ? `· 기안문에서 ${e.rows.length}개 행을 읽었습니다` : '· 기안문에서 예산 표를 찾지 못했습니다. 표 제목(예산내역·산출내역·세부내역)이나 금액 칸이 들어 있는지 확인하세요';
+  $('rowsInfo').style.color = e.rows.length ? '' : 'var(--err)';
+  $('attachInfo').textContent = (e.attach || []).length ? `(기안문 하단 붙임에서 ${e.attach.length}건)` : '(기안문에서 붙임을 찾지 못함)';
+}
+
+async function doExtract(opts = {}){
+  extracted = extract(masked.text);
+  let src = {}, e = extracted;
+  $('legend').style.display = 'none'; $('aiStatus').className = 'status';
+  $('engineBadge').textContent = '추출 엔진: 규칙 기반';
+  if ($('aiOn').checked){
+    stepOn(3, opts.quiet);
+    setStatus('aiStatus', 'run', 'AI가 기안문을 읽는 중입니다… (보통 10~40초)');
+    fillForm(e);
+    try {
+      const ai = await callAi(masked.text);
+      const m = mergeExtract(extracted, ai);
+      e = m.out; src = m.src;
+      const conflicts = Object.values(src).filter(s => s && s.conflict).length;
+      $('engineBadge').textContent = '추출 엔진: 규칙 + AI(' + $('aiModel').selectedOptions[0].text.split(' (')[0] + ')';
+      $('legend').style.display = '';
+      setStatus('aiStatus', conflicts ? 'run' : 'good',
+        (conflicts ? `AI 추출 완료 · 규칙과 다르게 읽은 칸 ${conflicts}개(주황색)를 확인하세요.` : 'AI 추출 완료 · 규칙 추출과 일치하거나 빈칸을 채웠습니다.') +
+        (e.notes ? ' AI 메모: ' + e.notes : ''));
+    } catch (err){ setStatus('aiStatus', 'bad', err.message); }
+  }
+  fillForm(e); markSrc(src);
+  stepOn(3, opts.quiet);
+}
+
+function readForm(){
+  const rows = [...$('tblRows').querySelectorAll('tbody tr')].map(tr => {
+    const o = {}; tr.querySelectorAll('[data-k]').forEach(el => o[el.dataset.k] = el.value.trim()); return o;
+  });
+  return {name:$('fName').value, date:$('fDate').value.trim(), dow:$('fDow').value.trim(),
+          named:+$('fNamed').value || 0, extra:$('fExtra').checked, meal:$('fMeal').checked, vat:$('fVat').checked,
+          rows, sum:$('fSum').value, total:$('fTotal').value, totalKo:$('fTotalKo').value,
+          budget:[1,2,3,4,5].map(i => $('fB' + i).value),
+          attach:$('fAttach').value.split(',').map(s => s.trim()).filter(Boolean),
+          from:$('optFrom').value, to:$('optTo').value, text:masked ? masked.text : '',
+          // 화면에 칸이 없는 보조 정보(예산 줄별 값, 비교견적, 품목)는 추출 결과에서 그대로 씀
+          budgetLines:extracted ? extracted.budgetLines : [], reqTotal:extracted ? extracted.reqTotal : '',
+          quotes:extracted ? extracted.quotes : [], items:extracted ? extracted.items : [], buyVendor:extracted ? extracted.buyVendor : '',
+          workParts:extracted ? extracted.workParts : null};
+}
+
+const LV = {err:['🔴 확인 필요','err'], warn:['🟡 보완','warn'], ok:['🟢 적합','ok'], info:['ℹ️ 안내','info']};
+function doCheck(){
+  results = runChecks(readForm());
+  const order = {err:0, warn:1, info:2, ok:3};
+  results.sort((a, b) => order[a.lv] - order[b.lv]);
+  const cnt = {err:0, warn:0, info:0, ok:0}; results.forEach(r => cnt[r.lv]++);
+  $('sumBox').innerHTML = ['err','warn','info','ok'].map(k => `<span class="lv ${k}">${LV[k][0]} ${cnt[k]}</span>`).join('');
+  $('tblResult').querySelector('tbody').innerHTML = results.map(r =>
+    `<tr><td><span class="lv ${LV[r.lv][1]}">${LV[r.lv][0]}</span></td><td>${esc(r.item)}</td><td>${esc(r.msg).replace(/ ▸ /g, '<br>▸ ')}</td><td class="basis">${esc(r.basis)}</td></tr>`).join('');
+  $('copyMsg').textContent = '';
+  stepOn(4);
+}
+
+function doCopy(){
+  const name = $('fName').value || '시행기안';
+  const items = results.filter(r => r.lv !== 'ok');
+  if (!items.length){ $('copyMsg').textContent = '보완할 항목이 없습니다.'; return; }
+  const text = `[사전점검] ${name}\n\n` + items.map((r, i) =>
+    `${i + 1}. ${LV[r.lv][0].replace(/^\S+\s/, '')} · ${r.item}\n   ${r.msg.replace(/ ▸ /g, '\n   ▸ ')}${r.basis ? `\n   (근거: ${r.basis})` : ''}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => $('copyMsg').textContent = '복사했습니다.', () => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); $('copyMsg').textContent = '복사했습니다.';
+  });
+}
+
+/* AI 설정: 키는 저장을 고른 경우에만 이 브라우저(localStorage)에 보관 */
+const keyStore = () => 'hufs-precheck-api-key-' + (isClova() ? 'clova' : 'anthropic');
+const MODEL_STORE = 'hufs-precheck-model';
+const sessionKeys = {anthropic:'', clova:''};   // 저장 안 한 키는 창을 닫을 때까지만 보관
+function loadKey(){
+  let saved = null;
+  try { saved = localStorage.getItem(keyStore()); } catch (e) {}
+  $('aiKey').value = saved || sessionKeys[isClova() ? 'clova' : 'anthropic'];
+  $('aiRemember').checked = !!saved;
+}
+function syncAiUi(){
+  const on = $('aiOn').checked, clova = isClova();
+  $('aiOpts').style.display = on ? '' : 'none';
+  $('clovaHint').style.display = on && clova ? '' : 'none';
+  $('aiKeyLabel').textContent = clova ? 'CLOVA Studio API 키' : 'Anthropic API 키';
+  $('aiKey').placeholder = clova ? 'nv-...' : 'sk-ant-...';
+  $('sendBadge').textContent = !on ? '시제품 · 모든 처리는 이 브라우저 안에서만 (외부 전송 없음)'
+    : '시제품 · AI 사용 중: 마스킹된 본문만 ' + (clova ? '네이버클라우드 CLOVA Studio로' : 'Anthropic API로') + ' 전송';
+}
+function saveKey(){
+  sessionKeys[isClova() ? 'clova' : 'anthropic'] = $('aiKey').value.trim();
+  try {
+    if ($('aiRemember').checked && $('aiKey').value.trim()) localStorage.setItem(keyStore(), $('aiKey').value.trim());
+    else localStorage.removeItem(keyStore());
+  } catch (e) {}
+}
+try {
+  const m = localStorage.getItem(MODEL_STORE);
+  if (m && [...$('aiModel').options].some(o => o.value === m)) $('aiModel').value = m;
+} catch (e) {}
+loadKey();
+$('aiOn').checked = false;   // 저장된 키가 있어도 'AI 추출 사용'에 동의하기 전에는 켜지 않음
+syncAiUi();
+
+/* AI 추출 사용: 확인 창에서 [사용]을 눌러야 AI 설정이 나타남 */
+function setAiVisible(show){
+  $('aiPanel').classList.toggle('hidden', !show);
+  $('aiOn').checked = show;
+  $('btnAi').textContent = show ? 'AI 추출 끄기' : 'AI 추출 사용';
+  syncAiUi();
+}
+$('btnAi').onclick = () => {
+  if (!$('aiPanel').classList.contains('hidden')) { setAiVisible(false); return; }
+  $('aiConfirm').showModal();
+};
+$('aiCancel').onclick = () => $('aiConfirm').close();
+$('aiAccept').onclick = () => { $('aiConfirm').close(); setAiVisible(true); $('aiKey').focus(); };
+$('aiOn').onchange = syncAiUi;
+$('aiModel').onchange = () => {
+  try { localStorage.setItem(MODEL_STORE, $('aiModel').value); } catch (e) {}
+  loadKey(); syncAiUi();
+};
+$('aiRemember').onchange = saveKey; $('aiKey').oninput = saveKey;
+
+/* 제목 클릭: 입력 내용을 비우고 첫 화면으로 (AI 설정은 유지) */
+function goHome(ev){
+  if (ev) ev.preventDefault();
+  $('src').value = '';
+  masked = null; extracted = null; results = [];
+  $('maskList').innerHTML = ''; $('maskedView').innerHTML = '';
+  $('tblRows').querySelector('tbody').innerHTML = '';
+  document.querySelectorAll('#c3 input[type=text], #c3 input[type=number]').forEach(el => { el.value = ''; el.classList.remove('src-ai', 'src-conflict'); el.removeAttribute('title'); });
+  document.querySelectorAll('#c3 label').forEach(el => { el.classList.remove('src-ai', 'src-conflict'); el.removeAttribute('title'); });
+  $('fExtra').checked = false; $('fMeal').checked = false; $('fVat').checked = true;
+  $('tblResult').querySelector('tbody').innerHTML = ''; $('sumBox').innerHTML = ''; $('copyMsg').textContent = '';
+  ['aiStatus', 'quickStatus'].forEach(id => $(id).className = 'status');
+  $('legend').style.display = 'none';
+  ['rowsInfo', 'budgetInfo', 'attachInfo'].forEach(id => $(id).textContent = '');
+  stepOn(1, true);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+// 초기 화면으로: 페이지를 새로 불러와 처음 상태로 (입력·결과·화면 위치 모두 초기화)
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+function reloadHome(ev){
+  if (ev) ev.preventDefault();
+  document.body.style.transition = 'opacity .15s'; document.body.style.opacity = '0';
+  setTimeout(() => { location.href = location.href.split('#')[0]; }, 150);   // 같은 주소로 새로 이동(입력값이 복원되지 않게)
+}
+$('homeLink').onclick = reloadHome;
+$('btnHome').onclick = reloadHome;
+window.scrollTo(0, 0);
+
+/* 맨 위로 버튼: 스크롤이 내려가면 표시 */
+const toTop = $('toTop');
+window.addEventListener('scroll', () => toTop.classList.toggle('show', window.scrollY > 400), {passive:true});
+toTop.onclick = () => window.scrollTo({top:0, behavior:'smooth'});
+
+async function doQuick(){
+  if (!doMask(true)) return;
+  $('btnQuick').disabled = true;
+  setStatus('quickStatus', 'run', $('aiOn').checked ? '마스킹 완료 · AI 추출 중… (보통 10~40초)' : '마스킹·추출 중…');
+  try { await doExtract({quiet:true}); doCheck(); $('quickStatus').className = 'status'; }
+  finally { $('btnQuick').disabled = false; }
+}
+
+$('btnSample').onclick = () => { $('src').value = SAMPLE; };
+$('btnMask').onclick = () => doMask();
+$('btnQuick').onclick = doQuick;
+$('btnBack1').onclick = () => stepOn(1);
+$('btnExtract').onclick = async () => { $('btnExtract').disabled = true; try { await doExtract(); } finally { $('btnExtract').disabled = false; } };
+$('btnBack2').onclick = () => stepOn(2);
+$('btnAddRow').onclick = () => { $('tblRows').querySelector('tbody').insertAdjacentHTML('beforeend', rowHtml({type:'goods'})); bindRowDel(); };
+$('btnCheck').onclick = doCheck;
+$('btnBack3').onclick = () => stepOn(3);
+$('btnCopy').onclick = doCopy;
+</script>
+</body>
+</html>
