@@ -264,7 +264,7 @@ function lectLimit(g, h){
 }
 const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유홍전고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부가복태목형피두감음빈동온호범좌팽승간상갈시견당';
 const STOP = ['우리대학','한예종','대학별','관계자','참석자','담당자','협약','행사','기념','외부','내부','전체','각','본교'];
-const TITLE = '[가-힣]*(?:부총장|총장|처장|원장|센터장|팀장|교수|과장|학장|부장|실장|위원장|위원|단장|소장|국장|차장|대표|이사장|이사|주임|연구원|강사|조교|주무관|사무관)';
+const TITLE = '[가-힣]*(?:부총장|총장|처장|원장|센터장|팀장|교수|과장|학장|부장|실장|위원장|위원|단장|소장|국장|차장|대표|이사장|이사|주임|연구원|강사|조교|주무관|사무관|교장|교감|교사)';
 
 /* ───────── 유틸 ───────── */
 const num = s => { if (s == null) return NaN; const t = String(s).replace(/[^\d.-]/g, ''); return t === '' ? NaN : Number(t); };
@@ -485,7 +485,7 @@ function classify(s){
   if (/강사료|특강비|특강료|강연료|강의료|원고료/.test(s)) return 'lecture';
   if (/설계\s*용역|감리/.test(s)) return 'service';
   if (/교육비|수강료|위탁\s*교육|교육\s*위탁|어학\s*교육/.test(s)) return 'service';   // 교육 위탁(용역)
-  if (/공사(?!비)|시공|리모델링|개보수|증축|철거|도장|방수/.test(s)) return 'construction';
+  if (/공사(?!비)|시공|리모델링|개보수|증축|철거|도장|방수|시설\s*개선|인테리어\s*공사/.test(s)) return 'construction';
   if (/용역|대행|임차|대관/.test(s)) return 'service';
   if (/상금|시상금|포상금/.test(s)) return 'prize';                                        // 대회·공모전 상금(지침 37쪽 한도)
   if (/활동\s*지원(비|금)|운영\s*지원금/.test(s)) return 'bundle';                          // 학생 활동 지원비(지침 36쪽): 여러 경비 묶음
@@ -911,6 +911,29 @@ function parseEvals(L){
   return rows.length ? {vendors, rows, selected:sel ? sel[1].trim() : ''} : null;
 }
 
+// 일정표의 특강 줄 주변에서 강사 유형(지침 35쪽 특별강의료 기준)과 강의 시간을 추정
+// 예) '15:05~16:05' / '60'' / '서포터즈 역량강화 특강' / '서울○○초등학교 ○○○ 선생님' → Ⅳ유형(초·중·고 교사), 1시간
+function inferLecture(L){
+  const idx = L.findIndex(l => /특강|강연(?!료)|초청\s*강의/.test(l) && !/특강비|특강료|강연료|강사료|사례발표비|\d{3},\d{3}/.test(l));
+  if (idx < 0) return null;
+  const around = L.slice(idx, idx + 3).join(' ');
+  const rules = [
+    [/(초등|중|고등)\s*학교[^\n]{0,25}(교장|교감)/, '3', 'Ⅲ유형(초·중·고 교장·교감)'],
+    [/(초등|중|고등)\s*학교[^\n]{0,25}(교사|선생님)|초\s*[·ㆍ]?\s*중\s*[·ㆍ]?\s*고\s*교사/, '4', 'Ⅳ유형(초·중·고 교사)'],
+    [/변호사|회계사|노무사|세무사|변리사/, '3', 'Ⅲ유형(전문자격사)'],
+    [/(타\s*)?대학교?[^\n]{0,20}(교수|강사|연구교수)/, '3', 'Ⅲ유형(타 대학 전임·비전임 교직원)'],
+  ];
+  const hit = rules.find(([re]) => re.test(around));
+  // 강의 시간: 특강 줄 바로 위 두 줄의 '60''·'60분' 또는 '15:05~16:05'
+  let hours = '';
+  const before = L.slice(Math.max(0, idx - 2), idx).join(' ');
+  const dm = before.match(/(\d{1,3})\s*['’′분]/), tm = before.match(/(\d{1,2}):(\d{2})\s*[~∼-]\s*(\d{1,2}):(\d{2})/);
+  if (dm) hours = String(Number(dm[1]) / 60);
+  else if (tm) hours = String(((Number(tm[3]) * 60 + Number(tm[4])) - (Number(tm[1]) * 60 + Number(tm[2]))) / 60);
+  const who = (L[idx + 1] || '').replace(/\[[A-Z]\]|\[이름\]|[가-힣]○+/g, '○○○').trim();
+  return {grade:hit ? hit[1] : '', reason:hit ? `일정표의 강사 정보(${who})로 ${hit[2]}으로 보았습니다` : '', hours, title:L[idx].trim()};
+}
+
 // 비교견적 표: 번호 | 업체명 | 금액 | 비고(발주·선정)
 function parseQuotes(L){
   const i = L.findIndex(l => /비교\s*견적|견적\s*비교|복수\s*견적/.test(l));
@@ -957,9 +980,12 @@ function extract(masked){
 
   // 날짜가 실제로 들어 있는 줄만, 행사·운영 날짜를 우선(평가일자·요청일자보다)
   const DATE_RE = /(\d{4})\s*[.\-년]\s*(\d{1,2})\s*[.\-월]\s*(\d{1,2})/;
-  const DL_KEY = /일시|일자|행사일|개최일|운영\s*기간|사업\s*기간|조사\s*(시기|기간)|접수\s*기간|모집\s*기간|신청\s*기간|프로그램\s*운영\s*[:：]|교육\s*기간|수업\s*기간|운영\s*일정/;
-  const dl = L.find(l => /일시|행사일|개최일|운영\s*(기간|일정)|프로그램\s*운영\s*[:：]|교육\s*기간|수업\s*기간/.test(l) && DATE_RE.test(l))
-          || L.find(l => DL_KEY.test(l) && DATE_RE.test(l)) || '';   // 일정표 속 날짜를 행사일로 오인하지 않게
+  // 날짜 줄 이름표는 띄어쓰기를 무시하고 비교('일  시', '일 자'): '2026. 11. 23.'과 '2026년 11월 23일' 모두
+  const DL_KEY = /일시|일자|행사일|개최일|운영기간|사업기간|조사(시기|기간)|접수기간|모집기간|신청기간|프로그램운영[:：]|교육기간|수업기간|운영일정/;
+  const DL_EVENT = /일시|행사일|개최일|운영(기간|일정)|프로그램운영[:：]|교육기간|수업기간/;
+  const nos = l => l.replace(/\s+/g, '');
+  const dl = L.find(l => DL_EVENT.test(nos(l)) && DATE_RE.test(l))
+          || L.find(l => DL_KEY.test(nos(l)) && DATE_RE.test(l)) || '';   // 일정표 속 날짜를 행사일로 오인하지 않게
   // 요일: '(수)' 또는 '수요일'
   const dm = dl.match(/(\d{4})\s*[.\-년]\s*(\d{1,2})\s*[.\-월]\s*(\d{1,2})\s*\.?\s*일?\s*(?:\(\s*([일월화수목금토])\s*\)|([일월화수목금토])요일)?/);
   if (dm){ out.date = `${dm[1]}-${dm[2].padStart(2,'0')}-${dm[3].padStart(2,'0')}`; out.dow = dm[4] || dm[5] || ''; }
@@ -986,6 +1012,13 @@ function extract(masked){
   out.items = parseItems(L);
   out.quotes = parseQuotes(L);
   out.evals = parseEvals(L);
+  // 강사료 행에 유형·시간이 없으면 일정표의 특강 줄에서 추정
+  const lec = inferLecture(L);
+  if (lec) out.rows.forEach(r => {
+    if (r.type !== 'lecture') return;
+    if (!r.grade && lec.grade){ r.grade = lec.grade; r.grade_reason = lec.reason; }
+    if (!r.hours && lec.hours) r.hours = lec.hours;
+  });
   const bv = all.match(/구매\s*업체\s*[:：]\s*(.+)/);
   out.buyVendor = bv ? bv[1].trim() : '';
   if (!out.name && out.items.length) out.name = out.items[0].name + (out.items.length > 1 ? ` 외 ${out.items.length - 1}종 구매` : ' 구매');
@@ -1035,7 +1068,7 @@ function extract(masked){
       || (/솔루션|소프트웨어|S\/W|라이선스|라이센스|패키지/i.test(all) && /도입|구입|구매|납품/.test(all));
     const kind = isBuy ? 'goods'
                : /설계\s*용역|감리/.test(out.name || '') ? 'service'
-               : /공사|시공|리모델링|개보수|증축/.test(out.name || '') ? 'construction'
+               : /공사|시공|리모델링|개보수|증축|시설\s*개선|인테리어|건축/.test(out.name || '') ? 'construction'
                : /공사\s*(개요|명|기간|범위|금액)|시설\s*공사/.test(all) ? 'construction'   // '교수학습개발원'의 '개발'보다 우선
                : /용역|개발|구축|고도화|유지\s*보수|위탁|대행|컨설팅|임차/.test(all) ? 'service'
                : classify(out.name || '') !== 'goods' ? classify(out.name) : 'goods';
@@ -1177,6 +1210,17 @@ function procure(amount, kind, vat, sole){
   return res;
 }
 
+// 산출내역 세부 항목('식대 376,200원, 다과 127,500원, 행사운영 72,890원')을 먹는 항목과 그 밖으로 나눔
+const FOOD_RE = /식대|식비|식사|오찬|만찬|중식|석식|조식|다과|간식|음료|도시락|커피|케이터링/;
+function foodSplit(basis){
+  // 항목 이름은 띄어쓰기 포함('진행물품 구입 72,890원')
+  const items = [...String(basis).matchAll(/([가-힣A-Za-z·](?:[가-힣A-Za-z· ]{0,14}[가-힣A-Za-z·])?)\s*[:：]?\s*(\d{1,3}(?:,\d{3})+|\d{4,})\s*원/g)]
+    .map(m => ({label:m[1].trim(), amt:num(m[2])})).filter(x => !/^(합계|계|총계|소계|총액|총)$/.test(x.label) && !isNaN(x.amt));
+  const foodItems = items.filter(x => FOOD_RE.test(x.label)), otherItems = items.filter(x => !FOOD_RE.test(x.label));
+  if (!foodItems.length || !otherItems.length) return null;   // 먹는 항목과 다른 항목이 섞여 있을 때만 나눔
+  return {food:foodItems.reduce((s, x) => s + x.amt, 0), foodItems, otherItems};
+}
+
 // 사업비 구성 항목의 비목: '(04)교육연구 환경개선비'처럼 줄이 나뉘거나 띄어 써도 찾음
 const BIMOK_LABEL = {prog:'교육·연구 프로그램 개발·운영비', equip:'실험·실습 기자재 구입·운영비', sch:'장학금', env:'교육·연구 환경개선비', etc:'그 밖의 사업운영 경비', pay:'인건비'};
 function getBimok(T){
@@ -1219,14 +1263,15 @@ function runChecks(f){
   // 본문에 적힌 날짜(요일 표기 있는 것)의 요일이 맞는지: '2026. 9. 29.(화)', '~ 11.16.(월)'(앞 날짜의 연도 사용)
   {
     let yr = null; const bad = []; let n = 0;
-    for (const m of (f.text || '').matchAll(/(?:(\d{4})\s*[.년]\s*)?(\d{1,2})\s*[.월]\s*(\d{1,2})\s*[.일]?\s*\(\s*([일월화수목금토])\s*\)/g)){
+    // 요일 표기: '(월)' 또는 '월요일'
+    for (const m of (f.text || '').matchAll(/(?:(\d{4})\s*[.년]\s*)?(\d{1,2})\s*[.월]\s*(\d{1,2})\s*[.일]?\s*(?:\(\s*([일월화수목금토])\s*\)|([일월화수목금토])요일)/g)){
       if (m[1]) yr = Number(m[1]);
       if (!yr) continue;
-      const mo = Number(m[2]), d = Number(m[3]);
+      const mo = Number(m[2]), d = Number(m[3]), w = m[4] || m[5];
       if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
       n++;
       const real = DOW[new Date(yr, mo - 1, d).getDay()];
-      if (real !== m[4]) bad.push(`${yr}. ${mo}. ${d}.(${m[4]}) → ${real}요일`);
+      if (real !== w) bad.push(`${yr}. ${mo}. ${d}.(${w}) → ${real}요일`);
     }
     if (bad.length) add('err', '본문 날짜 요일', `요일이 맞지 않는 날짜가 있습니다: ${bad.join(', ')}`);
     else if (n >= 2) add('ok', '본문 날짜 요일', `본문 날짜 ${n}개의 요일이 모두 맞습니다`);
@@ -1346,8 +1391,14 @@ function runChecks(f){
         else add('ok', `${label} 단가`, `1인 ${won(u)} (${why})`, G + '38쪽');
       } else if (f.attendees && !isNaN(a)){
         // 산출근거에 단가가 없으면 참여 인원으로 나눠 1인당 금액을 봄
-        const per = Math.round(a / f.attendees);
-        if (per > limit) add('err', `${label} 단가`, `산출근거에 단가가 없어 참여 인원 ${f.attendees}명으로 나누면 1인당 ${won(per)}입니다. ${why}을 넘습니다. 1인 단가 × 인원으로 산출근거를 적고 금액을 확인하세요`, G + '38쪽');
+        // 세부 항목이 있으면 식대·다과 같은 먹는 항목만 합산(행사운영·진행물품 등은 제외)
+        const sp = foodSplit(r.basis);
+        const base = sp ? sp.food : a;
+        const per = Math.round(base / f.attendees);
+        const how = sp ? `${sp.foodItems.map(x => `${x.label} ${won(x.amt)}`).join(' + ')} = ${won(sp.food)}을 참여 인원 ${f.attendees}명으로 나누면 1인당 ${won(per)}입니다(${sp.otherItems.map(x => `${x.label} ${won(x.amt)}`).join(', ')}은 식비가 아니라 제외)`
+                       : `산출근거에 단가가 없어 참여 인원 ${f.attendees}명으로 나누면 1인당 ${won(per)}입니다`;
+        if (per > limit) add('err', `${label} 단가`, `${how}. ${why}을 넘습니다. 1인 단가 × 인원으로 산출근거를 적고 금액을 확인하세요`, G + '38쪽');
+        else if (sp) add('ok', `${label} 단가`, `${how}. ${why} 이내입니다`, G + '38쪽');
         else add('warn', `${label} 단가`, `참여 인원 ${f.attendees}명 기준 1인당 ${won(per)}(${why} 이내)입니다. 산출근거에 1인 단가 × 인원을 적으세요`, G + '38쪽');
         if (hasSnack && hasMeal && !f.meal && per > MEAL.snack) add('info', `${label} 식사 일정`, '식대가 들어 있는데 행사 일정에 식사 시간이 없습니다. 식사를 하면 일정에 넣고, 다과만 하면 1인 최대 10,000원입니다', G + '38쪽');
       } else add('warn', `${label} 단가`, '1인 단가 × 인원으로 산출근거를 적어 주세요', G + '38쪽');
@@ -1390,10 +1441,27 @@ function runChecks(f){
         add('info', `${label} 기념품 제작`, '기념품·홍보물품은 사업 로고 각인이나 스티커로 사업 홍보물품임을 알 수 있게 하고, 수불대장(구매·반출 수량, 수령자 명단·서명)을 남기세요. 사업기간에 필요한 수량만 구입합니다', '대학재정지원사업 삼일회계법인 자료 38쪽');
       if (/기구|장비|기자재|카메라|조명|마이크|삼각대/.test(bb) && /구입|구매/.test(bb))
         add('info', `${label} 기구 구입`, '촬영 기구·장비 등 오래 쓰는 물품을 사면 사업 스티커를 붙이고 자산관리대장으로 관리하세요', G + '14쪽, 40쪽');
+      // 운영비에 식대·다과 세부 금액이 있고 참여 인원을 알면 먹는 항목만 합산해 1인당 금액 점검
+      const spB = f.attendees ? foodSplit(r.basis) : null;
+      if (spB){
+        const fl = spB.foodItems.map(x => x.label).join(' ');
+        const sn = /다과|간식|음료|커피/.test(fl), ml = /식대|식비|식사|오찬|만찬|중식|석식|조식|도시락|케이터링/.test(fl);
+        const lim = sn && ml ? MEAL.both : sn ? MEAL.snack : MEAL.meal;
+        const per = Math.round(spB.food / f.attendees);
+        const msg = `${spB.foodItems.map(x => `${x.label} ${won(x.amt)}`).join(' + ')} = ${won(spB.food)} ÷ 참여 인원 ${f.attendees}명 = 1인당 ${won(per)} (${spB.otherItems.map(x => x.label).join('·')}은 제외)`;
+        per > lim ? add('err', `${label} 식비 단가`, `${msg}. 1인 최대 ${won(lim)}을 넘습니다`, G + '38쪽')
+                  : add('ok', `${label} 식비 단가`, `${msg}. 1인 최대 ${won(lim)} 이내`, G + '38쪽');
+      }
       if (/식|다과|간식|음료|도시락|회의비/.test(r.content + r.basis)) add('info', `${label} 식대 포함`, '운영비에 식대·다과비가 들어 있으면 집행할 때도 1인 단가 기준(식사 25,000원 / 다과 10,000원 / 연속 진행 30,000원)을 지켜야 합니다', G + '38쪽');
       if (!isNaN(a)){
         const est = f.vat ? a / 1.1 : a;
-        if (est > 5e5) add('info', `${label} 견적`, '같은 업체 구매가 추정가격 50만 원을 넘으면 2인 이상 복수견적이 필요합니다', R + '제9조제1항');
+        // 견적 안내는 기념품·물품 구입·제작이 들어 있을 때만 (식대·회의비만 있는 운영비에는 해당 없음)
+        const goodsInBundle = (bb.match(/기념품|답례품|굿즈|홍보\s*물품|물품|소모품|비품|문구|현수막|배너|인쇄물?|제작|장비|기구|기자재/g) || []);
+        // 안내에 보여 줄 품목: '제작·물품' 같은 일반어는 다른 품목이 있으면 빼고 이름만
+        const named = [...new Set(goodsInBundle.map(w => w.replace(/\s+/g, '')))].filter(w => !/^(제작|물품)$/.test(w));
+        const what = named.length ? `${named.slice(0, 3).join('·')} 등 물품` : '물품';
+        if (est > 5e5 && goodsInBundle.length)
+          add('info', `${label} 견적`, `운영비 중 ${what}을 같은 업체에서 추정가격 50만 원 넘게 구매하면 2인 이상 복수견적이 필요합니다`, R + '제9조제1항');
         if ((f.vat ? a : a * 1.1) > 1.1e7) procure(a, 'goods', f.vat, sole).forEach(p => add(p[0], `${label} 계약`, p[1], p[2]));
       }
     }
@@ -1413,8 +1481,13 @@ function runChecks(f){
         const u = num(r.unit), q = num(r.qty) || 1, a = num(r.amount);
         const per = !isNaN(u) ? u : (!isNaN(a) ? a / q : NaN);
         const how = L.once ? '1회당 최대' : `최초 1시간 ${won(L.first)} + 초과 1시간당 ${won(L.extra)}, ${isNaN(h) ? 1 : h}시간 기준 최대`;
+        if (r.grade_reason) add('info', `${label} 강사 유형`, `${r.grade_reason}.${isNaN(h) ? '' : ` 강의 시간은 일정표 기준 ${h}시간입니다.`} 강사 이력으로 유형을 확인하세요`, B);
+        // 특강비에 사례발표비·토론비 등 다른 지급이 함께 묶인 경우: 특강비 상한만 알려 주고 나눠 적도록
+        const mixed = /사례\s*발표|발표비|토론|사회자|원고|패널/.test(r.content + ' ' + r.basis);
         if (!isNaN(per)){
-          if (per > lim) add('err', `${label} 단가`, `1회 ${won(per)} — ${L.label} ${how} ${won(lim)}을 넘습니다. 유형 근거(강사 이력)를 확인하거나 금액을 조정하세요`, B + ', 74쪽');
+          if (mixed && per > lim)
+            add('warn', `${label} 단가`, `특강 강사(${L.label}) 강의료는 ${how} ${won(lim)}입니다. 이 항목(${won(per)})에는 사례발표비 등이 함께 들어 있으니, 특강비와 사례발표비를 나눠 '단가 × 인원(시간)'으로 산출근거를 적으세요. 사례발표자도 섭외 후 유형을 확인해 같은 기준을 적용합니다`, B + ', 38쪽');
+          else if (per > lim) add('err', `${label} 단가`, `1회 ${won(per)} — ${L.label} ${how} ${won(lim)}을 넘습니다. 유형 근거(강사 이력)를 확인하거나 금액을 조정하세요`, B + ', 74쪽');
           else add('ok', `${label} 단가`, `1회 ${won(per)} ≤ ${L.label} ${how} ${won(lim)}`, B);
         }
       }
@@ -1606,11 +1679,15 @@ function runChecks(f){
   // 오픈·완료 예정일이 사업기간 안인지: '2027. 1. 오픈 예정'
   // '2027. 08. : 전체 공사 준공'처럼 날짜와 단어 사이에 글자가 있어도 읽음(같은 줄 20자 이내). 여러 개면 가장 늦은 날짜
   const ops = [...T.matchAll(/(\d{4})\s*[.년]\s*(\d{1,2})\s*[.월]?\s*(?:\d{1,2}\s*[.일]?\s*)?[^\n\d~]{0,20}?(오픈|개통|구축\s*완료|완공|완료|납품|준공)/g)];
+  // '개발기간: 2027년 1월 이내 …', '용역기간: 2026년 12월까지'처럼 기간 줄의 '○년 ○월 이내·까지·말'
+  for (const l of T.split('\n').filter(l => /(개발|계약|용역|과업|수행|공사|사업|운영)\s*기간/.test(l)))
+    for (const m of l.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:\d{1,2}\s*일\s*)?(이내|까지|말)/g)) ops.push(m);
   const op = ops.sort((a, b) => (`${b[1]}-${b[2].padStart(2, '0')}`).localeCompare(`${a[1]}-${a[2].padStart(2, '0')}`))[0];
   if (op && f.to){
     const ym = `${op[1]}-${op[2].padStart(2, '0')}`;
-    if (ym > f.to.slice(0, 7)) add('err', '완료 일정', `${op[3]} 예정(${ym})이 사업기간 종료(${f.to})보다 늦습니다. 계약기간과 대금 지급은 사업기간 안이어야 합니다. 불가피하면 예산 이월(한국연구재단 승인 필요)을 혁신지원팀과 미리 협의하세요`, G + '14쪽, 15쪽');
-    else add('ok', '완료 일정', `${op[3]} 예정(${ym})이 사업기간 안입니다. 입찰 지연·유찰에 대비해 일정 여유를 확인하세요`, G + '15쪽');
+    const word = /이내|까지|말/.test(op[3]) ? '완료' : op[3].replace(/\s+/g, ' ');   // '2027년 1월 이내' → '완료 예정'
+    if (ym > f.to.slice(0, 7)) add('err', '완료 일정', `${word} 예정(${ym})이 사업기간 종료(${f.to})보다 늦습니다. 계약기간과 대금 지급은 사업기간 안이어야 합니다. 불가피하면 예산 이월(한국연구재단 승인 필요)을 혁신지원팀과 미리 협의하세요`, G + '14쪽, 15쪽');
+    else add('ok', '완료 일정', `${word} 예정(${ym})이 사업기간 안입니다.${sole.bid ? ' 입찰 지연·유찰에 대비해 일정 여유를 확인하세요.' : ' 대금 지급까지 사업기간 안에 끝나도록 일정을 확인하세요.'}`, G + '15쪽');
   }
 
   // 비교견적 표가 없을 때: 견적 요청 업체 수('요청기관(2개)') 또는 평가표의 업체 수
@@ -1681,8 +1758,13 @@ function runChecks(f){
     add('info', '기자재 관리', '사업비로 구입한 기자재에는 사업 스티커를 붙이고 자산관리대장으로 관리하세요(위치가 바뀌면 총괄지원팀 관재파트에 통보)', G + '14쪽');
   }
   // 결과보고 때 비목별로 추가하는 첨부자료 (지침 25쪽 표)
+  // 환경개선비의 검수조서(공사서류)·사진은 공사 건에만 해당 (시스템 개발·PC 구매 등에는 안내하지 않음)
   const ATT = {equip:'기자재 활용계획서, 기자재 관리대장, 사진자료', env:'검수조서(공사서류), 사진자료'};
-  if (ATT[bimok]) add('info', '결과보고 첨부(비목별)', `비목이 ${BIMOK_LABEL[bimok]}이므로 결과보고 때 ${ATT[bimok]}를 첨부합니다`, G + '25쪽');
+  // 공사 영역: 공사뿐 아니라 시설개선·시설공사·건축·설계 용역·인테리어 등(사업명·예산 항목 기준)
+  const isWork = rows.some(r => r.type === 'construction')
+    || /공사|시설\s*개선|시설\s*공사|건축|설계\s*용역|인테리어|리모델링|개보수|증축|보수\s*공사/.test((f.name || '') + ' ' + rows.map(r => r.content).join(' '));
+  if (ATT[bimok] && (bimok !== 'env' || isWork))
+    add('info', '결과보고 첨부(비목별)', `비목이 ${BIMOK_LABEL[bimok]}${bimok === 'env' ? '이고 공사(시설개선) 건' : ''}이므로 결과보고 때 ${ATT[bimok]}를 첨부합니다`, G + '25쪽');
   // 계약기간: '진행업체/개발기간: 업체 / 4개월 이내'처럼 업체명이 섞여도 기간 부분만
   const perLine = T.split('\n').find(l => /(개발|계약|용역|과업|수행|공사)\s*기간/.test(l)) || '';
   const perM = perLine.match(/\d{4}\s*\.\s*\d{1,2}\s*\.\s*\d{1,2}\.?\s*[~∼-]\s*(\d{4}\s*\.\s*)?\d{1,2}\s*\.\s*\d{1,2}\.?|(계약\s*(체결)?|착공)\s*일로?부터\s*\d+\s*(개월|일)\s*(간|이내)?|\d+\s*(개월|주|일)\s*(이내)?/);
@@ -2009,7 +2091,7 @@ function rowHtml(r){
     <td><input data-k="qty" value="${esc(r.qty || '')}"></td><td><input data-k="amount" value="${esc(r.amount || '')}"></td>
     <td><select data-k="grade"><option value="">(유형 선택)</option>${Object.entries(LECT).map(([k, v]) => `<option value="${k}"${k === r.grade ? ' selected' : ''}>${v.label}</option>`).join('')}</select>
         <input data-k="hours" placeholder="강의 시간(1회)" value="${esc(r.hours || '')}" style="margin-top:3px">
-        ${r.grade_reason ? `<div class="note" style="font-size:11.5px;margin-top:3px">AI 추정: ${esc(r.grade_reason)}</div>` : ''}</td>
+        ${r.grade_reason ? `<div class="note" style="font-size:11.5px;margin-top:3px">자동 추정: ${esc(r.grade_reason)}</div>` : ''}</td>
     <td><button class="small" data-del>삭제</button></td></tr>`;
 }
 function bindRowDel(){ $('tblRows').querySelectorAll('[data-del]').forEach(b => b.onclick = () => b.closest('tr').remove()); }
