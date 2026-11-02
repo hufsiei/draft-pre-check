@@ -275,7 +275,7 @@ function lectLimit(g, h){
   return L.first + Math.max(0, Math.ceil(h || 1) - 1) * L.extra;
 }
 const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유홍전고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부가복태목형피두감음빈동온호범좌팽승간상갈시견당';
-const STOP = ['우리대학','한예종','대학별','관계자','참석자','담당자','협약','행사','기념','외부','내부','전체','각','본교'];
+const STOP = ['우리대학','한예종','대학별','관계자','참석자','담당자','협약','행사','기념','외부','내부','전체','각','본교','연번','순번','번호'];   // 표 머리 '연번'은 이름 아님(성 '연'과 겹침)
 const TITLE = '[가-힣]*(?:부총장|총장|처장|원장|센터장|팀장|교수|과장|학장|부장|실장|위원장|위원|단장|소장|국장|차장|대표|이사장|이사|주임|연구원|강사|조교|주무관|사무관|교장|교감|교사)';
 
 /* ───────── 유틸 ───────── */
@@ -460,14 +460,22 @@ function maskText(text, opt){
       (all, w, rest, off, str) => okName(w) && notRoom(str, off + w.length) ? tok(w) + rest : all);
     // ④ 학과·학부 다음 이름: '영어학과 홍길동(3학년)', '경영학부 홍길동,'
     t = t.replace(/((?:학과|학부)\s+)([가-힣]{2,4})(?=\s*(?:[,()\/]|$|\d\s*학년))/gm, (all, pre, w) => okName(w) ? pre + tok(w) : all);
-    // ⑤ '성명'·'이름' 열이 있는 표: 이름만 있는 칸
+    // ⑤ '성명'·'이름'·'담당교수' 같은 사람 열이 있는 표: 이름만 있는 칸 (표가 여러 개면 모두)
+    // 표 안에서는 끝글자 제한을 풀고('김용식'), 학과·단과대·지원 분야 같은 칸만 제외. '김혜진H'처럼 동명이인 구분 글자도 함께 가림
     {
       const ls = t.split('\n');
-      const h = ls.findIndex(l => /^\s*(성\s*명|이\s*름)\s*$/.test(l));
-      if (h >= 0) for (let k = h + 1; k < Math.min(ls.length, h + 200); k++){
-        const w = ls[k].trim();
-        if (okName(w)) ls[k] = ls[k].replace(w, tok(w));
-      }
+      const HEAD = /^\s*(성\s*명|이\s*름|담당\s*교수|지도\s*교수|담당자|책임자|교수명|학생명|대표자)\s*$/;
+      const NOT = /(대학|학과|학부|과|부|없음|전공|지도|연구|지원|합계|소계|계|원|센터|팀|처|실|단)$/;
+      const okCell = w => { const k = w.replace(/[A-Za-z]$/, '');
+        return !NOT.test(k) && (okName(w) || (/^[가-힣]{2,4}$/.test(k) && SURNAMES.includes(k[0]) && !STOP.includes(k) && !COMMON.has(k) && !TITLE_ONLY.test(k))); };
+      ls.forEach((l, h) => {
+        if (!HEAD.test(l)) return;
+        for (let k = h + 1; k < Math.min(ls.length, h + 400); k++){
+          if (HEAD.test(ls[k]) || /^\s*(?:[가-하]\.|\d\))\s/.test(ls[k])) break;   // 다음 표나 다음 항목에서 멈춤
+          const w = ls[k].trim();
+          if (w && okCell(w)) ls[k] = ls[k].replace(w, tok(w));
+        }
+      });
       t = ls.join('\n');
     }
   }
@@ -504,7 +512,7 @@ function classify(s){
   if (/지급비|연구비|활동비|수당|사례비|장려금|참가비\s*지원/.test(s)) return 'payment';   // 개인에게 주는 돈
   return 'goods';
 }
-const TYPE_LABEL = {meal:'식대·다과', gift:'기념품', voucher:'유가증권', bundle:'운영비(묶음)', lecture:'강사료·특강료', advice:'자문료·멘토링', payment:'지급비·연구비·활동비', prize:'상금', scholarship:'장학금', service:'용역', construction:'공사', goods:'물품'};
+const TYPE_LABEL = {meal:'식대·다과', gift:'기념품', voucher:'유가증권', bundle:'운영비(묶음)', lecture:'강사료·특강료', advice:'자문료·멘토링', payment:'지급비·연구비·활동비', prize:'상금', scholarship:'장학금', service:'용역', construction:'공사', goods:'물품', dept:'학과·부서 지원(교내 배분)'};
 function parseGrade(s){
   const roman = {'Ⅰ':1,'Ⅱ':2,'Ⅲ':3,'Ⅳ':4,'I':1,'II':2,'III':3,'IV':4,'1':1,'2':2,'3':3,'4':4};
   let m = s.match(/국외\s*(Ⅰ|Ⅱ|Ⅲ|III|II|I|[123])/);
@@ -1057,6 +1065,19 @@ function extract(masked){
   if (/(VAT|부가세|부가가치세)\s*(별도|미포함|제외)/i.test(all)) out.vat = false;
   else if (/(VAT|부가세|부가가치세)\s*포함/i.test(all)) out.vat = true;
 
+  // 부서가 학과(부)에 직접 나눠 주는 지원(학과특성화 등): 학과별 사업비 표를 표마다 한 행으로 (계약 아님)
+  if (!out.rows.length){
+    const dt = parseDeptTables(L);
+    if (dt.length){
+      out.deptTables = dt;
+      out.rows = dt.map(t => {
+        const rs = t.rows.reduce((a, r) => a + r.amount, 0);
+        return {content:`학과(부) 직접 지원 (${t.rows.length}개 학과(부))`, type:'dept', basis:`학과별 사업비 합 ${fmt(rs)}원`,
+                unit:'', qty:String(t.rows.length), amount:fmt(t.total || rs), grade:'', hours:''};
+      });
+      if (!out.sum) out.sum = fmt(dt.reduce((a, t) => a + (t.total || t.rows.reduce((b, r) => b + r.amount, 0)), 0));
+    }
+  }
   // 세부 산출내역 표가 없는 기안(계약 건 등): 소요예산 전체를 한 행으로
   if (!out.rows.length && out.total){
     const isSch = classify(out.name || '') === 'scholarship' || /\(\s*03\s*\)\s*장학금|장\s*학\s*금\s*명|장학생을?\s*선발/.test(all);
@@ -1118,6 +1139,31 @@ function extract(masked){
 }
 
 // 붙임 목록: 기안문 맨 아래 "붙임 1. ○○ 1부. 2. ○○ 각 1부. 끝." (번호 없음·부수 없음·쉼표 나열도 처리)
+// 학과(부)별 지원 표: 「연번|단과대학|학과|담당교수|지원 분야|재학생(명)|사업비(원)」처럼 칸이 한 줄씩 붙여넣어진 표
+// 학과 열 + 금액 열(사업비·지원금·배정액·금액)이 있어야 함. 행은 연번 1, 2, 3…으로 나누고 금액은 행의 마지막 쉼표 숫자
+function parseDeptTables(L){
+  const out = [];
+  for (let i = 0; i < L.length; i++){
+    if (!/^연\s*번$/.test(L[i])) continue;
+    let j = i + 1; const head = [L[i]];
+    while (j < L.length && j < i + 12 && L[j] !== '1') head.push(L[j++]);
+    const di = head.findIndex(h => /^학과(\(부\))?$|^학과명$|^학부\(과\)$|^학과\(학부\)$/.test(h));
+    if (di < 0 || !head.some(h => /사업비|지원\s*(금|액)|배정\s*액|^금\s*액/.test(h)) || L[j] !== '1') continue;
+    const rows = []; let k = 1, total = 0;
+    while (j < L.length && L[j] === String(k)){
+      const cells = []; j++;
+      while (j < L.length && L[j] !== String(k + 1) && !/^(합\s*계|소\s*계|계)$/.test(L[j]) && !/^연\s*번$/.test(L[j]) && cells.length < head.length + 4) cells.push(L[j++]);
+      const am = [...cells].reverse().find(c => /^\d{1,3}(,\d{3})+$/.test(c));
+      if (am) rows.push({dept:cells[di - 1] || '', amount:num(am)});
+      k++;
+    }
+    if (/^(합\s*계|계)$/.test(L[j] || '') && /^[\d,]+$/.test(L[j + 1] || '')) total = num(L[j + 1]);
+    if (rows.length >= 2) out.push({rows, total});
+    i = j;
+  }
+  return out;
+}
+
 function parseAttachments(L){
   let i = -1;
   for (let k = L.length - 1; k >= 0; k--) if (/^붙\s*임/.test(L[k])){ i = k; break; }   // 맨 아래 '붙임'부터
@@ -1522,6 +1568,22 @@ function runChecks(f){
       } else add('info', `${label} 한도`, `상금 1등 1인 최대: 학과 단위 30만 / 단과대학 50만 / 학교 단위 100만 / 외부 연계 200만 원. 대회 단위를 적어 두면 판정할 수 있습니다${top ? ` (최고 상금 ${won(top)})` : ''}`, G + '37쪽');
       add('info', `${label} 증빙`, '결과보고 때 심사 내용과 결과, 포상금 지급대장을 함께 제출하세요', G + '36쪽');
     }
+    if (r.type === 'dept'){
+      // 부서가 학과(부)에 직접 배분하는 지원금은 업체와의 계약이 아니므로 견적·입찰·나라장터 공고 대상 아님 (사용자 실무 기준 2026-11-02)
+      add('ok', `${label}`, '부서가 학과(부)에 직접 지원하는 교내 배분 사업비입니다. 용역·물품 계약이 아니므로 견적·나라장터 공고 대상이 아닙니다', '학교 실무 기준');
+      // 표의 학과별 금액 합 = 표 합계
+      const bm = r.basis.match(/합\s*([\d,]+)\s*원/), rs = bm ? num(bm[1]) : NaN;
+      if (!isNaN(rs) && !isNaN(a)){
+        if (rs !== a) add('err', `${label} 합계`, `학과별 사업비 합 ${won(rs)}과 표 합계 ${won(a)}가 다릅니다`);
+        else add('ok', `${label} 합계`, `학과별 사업비 합 ${won(rs)} = 표 합계`);
+      }
+      // 본문의 'N개 학과(부)'와 표의 학과 수
+      const claims = [...T.matchAll(/(\d+)\s*개\s*학과/g)].map(m => +m[1]);
+      if (claims.length && r.qty){
+        if (claims.includes(+r.qty)) add('ok', `${label} 학과 수`, `표의 ${r.qty}개 학과(부)가 본문의 학과 수와 맞습니다`);
+        else add('warn', `${label} 학과 수`, `표에는 ${r.qty}개 학과(부)인데 본문에는 ${claims.join('·')}개로 적혀 있습니다`);
+      }
+    }
     if (r.type === 'payment'){
       // 프로그램(행사) 참여가 확정되면 지급하는 참여비·연구비·활동비는 적정 (학교 실무 기준)
       add('ok', `${label}`, '프로그램 참여 확정에 따라 지급하는 경비', '학교 실무 기준');
@@ -1840,7 +1902,7 @@ const AI_SYSTEM = `너는 한국외국어대학교 대학혁신지원사업 시�
   - '5만원권*5명'의 만원권·천원권은 원 단위로 읽는다
   - 장학금 기안처럼 '1인당 금액'과 '선발 인원'만 있으면 행 하나로: unit=1인당 금액(원 단위, 400만원→4000000), qty=인원, amount=총액
   - 계약·구매 건처럼 산출내역 표가 없고 소요예산(구매금액·계약금액) 총액만 있으면, 사업명을 content로, 총액을 amount로 하는 행 하나만 만든다(basis는 "세부 산출내역 없음(소요예산 전체)")
-  - type: meal(식대·다과), gift(기념품·답례품·홍보물품), voucher(상품권·기프티콘 등 유가증권), bundle(운영비처럼 여러 경비를 한 항목으로 묶은 것), lecture(강사료·특강료·강연료·강의료·원고료), advice(자문료·멘토링·외부 전문가 활용비), payment(지급비·연구비·활동비·수당·사례비처럼 개인에게 주는 돈), prize(대회·공모전 상금·포상금), scholarship(장학금), service(용역·대행·임차·대관, 시스템 개발·기능 추가, 설계 용역·감리), construction(시설공사·리모델링·보수·인테리어 공사), goods(그 밖의 물품. 소프트웨어·솔루션·라이선스를 도입·구입하는 것도 물품)
+  - type: meal(식대·다과), gift(기념품·답례품·홍보물품), voucher(상품권·기프티콘 등 유가증권), bundle(운영비처럼 여러 경비를 한 항목으로 묶은 것), lecture(강사료·특강료·강연료·강의료·원고료), advice(자문료·멘토링·외부 전문가 활용비), payment(지급비·연구비·활동비·수당·사례비처럼 개인에게 주는 돈), prize(대회·공모전 상금·포상금), scholarship(장학금), service(용역·대행·임차·대관, 시스템 개발·기능 추가, 설계 용역·감리), construction(시설공사·리모델링·보수·인테리어 공사), goods(그 밖의 물품. 소프트웨어·솔루션·라이선스를 도입·구입하는 것도 물품), dept(부서가 학과(부)에 직접 나눠 주는 지원금. 학과별 사업비 표가 있으면 표마다 한 행, 계약 아님)
   - 표에 금액 열이 따로 없고 '세부 내역' 칸에 "항목명 / 식 또는 금액"이 번갈아 나오면 항목마다 한 행으로 나눈다. 연번·예산 사업명([혁신]…)·사업코드는 행 내용이 아니다
   - basis: 산출근거 칸 내용 그대로(비고가 있으면 괄호로 덧붙임)
   - unit: 1인·1회·1개당 단가, qty: 인원·수량·횟수. 산출근거에 있을 때만 적는다
@@ -1882,14 +1944,24 @@ function docChecks(text){
   const ex = arr => arr.slice(0, 3).map(s => ' ▸ ' + s).join('') + (arr.length > 3 ? ` ▸ 외 ${arr.length - 3}곳` : '');
 
   // 1. 제목
-  const tl = L.map(l => l.match(/^\s*제\s*목\s*[:：]?\s*(.+)$/)).find(Boolean);
+  // '제목 ○○' 또는 '제목' 다음 줄에 제목(전자결재에서 복사하면 줄이 나뉨)
+  const ti = L.findIndex(l => /^\s*제\s*목\s*[:：]?/.test(l));
+  let tl = null;
+  if (ti >= 0){
+    const same = L[ti].replace(/^\s*제\s*목\s*[:：]?\s*/, '').trim();
+    const next = L.slice(ti + 1).find(l => l.trim());
+    const v = same || (next || '').trim();
+    if (v) tl = [null, v];
+  }
   if (tl){
     if (/에\s*(관한|대한)\s*(일|건)\s*$/.test(tl[1])) add('warn', '문서 제목', `제목을 '~에 관한 일'로 끝내지 말고 내용을 알 수 있게 간단·명확하게 쓰세요 ▸ ${clip(tl[1])}`, '제목');
     else add('ok', '문서 제목', `'~에 관한 일' 표기 없음 ▸ ${clip(tl[1])}`, '제목');
   }
 
   // 2. 관련 근거 표기
-  const rel = hits(/관련\s*근거/g);
+  const attAt = body.search(/^\s*붙\s*임/m);
+  const pre = attAt >= 0 ? body.slice(0, attAt) : body;   // 붙임 목록의 '관련 근거 1부'는 문서 이름이라 제외
+  const rel = [...new Set([...pre.matchAll(/(?:^|[.)]\s)\s*관련\s*근거\s*[:：]?|관련\s*근거\s*[:：]/gm)].map(m => clip(m[0])))];
   if (rel.length) add('warn', '관련 표기', `'관련근거' 대신 '관련:'으로 통일하세요${ex(rel)}`, '관련 근거 표기');
   const relWeak = hits(/위\s*(?:\(?호\)?)?\s*(?:와|과)?\s*관련\s*,|위\s*(?:\(?호\)?)?\s*(?:와|과)\s*관련하여\s*,/g);
   if (relWeak.length) add('warn', '관련 언급', `'위와 관련,'·'위 호 관련,' 대신 '위 호와 관련하여'(뒤에 쉼표 없음)로 쓰거나 관련 언급 없이 바로 본문을 쓰세요${ex(relWeak)}`, '관련 언급');
@@ -1971,8 +2043,11 @@ function docChecks(text){
   if (attStart >= 0){
     const noDot = L.slice(attStart).filter(l => /\d+\s*부(?!\s*\.)/.test(l)).map(clip);
     if (noDot.length) add('warn', '붙임 마침표', `붙임은 항목마다 마침표를 찍습니다. 예: 관련 공문 사본 1부.${ex(noDot)}`, '붙임');
-    const glued = L.slice(attStart).filter(l => /부\.\s?끝/.test(l)).map(clip);
+    const glued = L.slice(attStart).filter(l => /[.)]끝/.test(l)).map(clip);
+    const one = L.slice(attStart).filter(l => /[.)] 끝/.test(l)).map(clip);
     if (glued.length) add('warn', "'끝' 띄어쓰기", `마지막 마침표 다음 두 칸 띄우고 '끝.'을 씁니다. 예: 관련 공문 사본 1부.  끝.${ex(glued)}`, '붙임');
+    // 붙여넣기에서 두 칸이 한 칸으로 줄기도 하므로 한 칸은 안내만
+    else if (one.length) add('info', "'끝' 띄어쓰기", `'끝.' 앞이 한 칸으로 보입니다. 한글 문서에서 두 칸 띄웠는지 확인하세요(붙여넣으면 칸이 줄 수 있음)${ex(one)}`, '붙임');
   }
   if (!endM) add('warn', "'끝' 표시", "본문(또는 붙임) 마지막에 '끝.'이 보이지 않습니다. 붙여넣기에서 빠진 것인지 확인하세요", "'끝' 표시");
   else if (!/\.\s*$/.test(endM[0])) add('warn', "'끝' 표시", "'끝' 다음에 마침표를 찍어 '끝.'으로 쓰세요", "'끝' 표시");
