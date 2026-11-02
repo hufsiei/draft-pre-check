@@ -48,6 +48,10 @@
   .lv{font-weight:bold;white-space:nowrap;border-radius:4px;padding:1px 6px;font-size:13px}
   .lv.ok{color:var(--ok);background:var(--okbg)} .lv.warn{color:var(--warn);background:var(--warnbg)}
   .lv.err{color:var(--err);background:var(--errbg)} .lv.info{color:var(--info);background:var(--infobg)}
+  .cat-tabs{display:flex;gap:0;border-bottom:2px solid var(--navy);margin:4px 0 10px;flex-wrap:wrap}
+  .cat-tabs button{border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;background:#eef2f7;color:var(--muted);font-weight:bold;padding:8px 16px;margin-right:4px}
+  .cat-tabs button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .cat-tabs .cnt{font-weight:normal;font-size:12.5px;margin-left:6px}
   .summary{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
   .summary span{padding:6px 12px;border-radius:6px;font-weight:bold}
   td.basis{font-size:12.5px;color:var(--muted)}
@@ -80,11 +84,11 @@
 <body>
 <header>
   <h1><a href="#" id="homeLink" title="처음 화면으로">기안문 사전점검</a></h1>
-  <span class="sub">대학혁신지원사업 사업비 시행기안 · 결재 전 기준 점검</span>
+  <span class="sub">대학혁신지원사업 사업비 시행기안 · 결재 전 예산 지침·공문서 작성지침 점검</span>
   <span class="badge" id="sendBadge">모든 처리는 이 브라우저 안에서만 (외부 전송 없음)</span>
 </header>
 <main>
-  <div class="notice"><b>안내</b>&nbsp; 이 기안문 사전점검봇은 대학혁신지원사업 사업비 활용을 위한 시행기안(원안기안) 시 예산 사용, 산출근거 등의 보완점을 사전 검토하는 용도로 만들어졌습니다. 일부 내용은 정확하지 않을 수 있으며, 반드시 기안자가 최종 확인 후 진행하여 주시기 바랍니다.<br><br>
+  <div class="notice"><b>안내</b>&nbsp; 이 기안문 사전점검봇은 대학혁신지원사업 사업비 활용을 위한 시행기안(원안기안) 시 예산 사용, 산출근거,<br>우리 대학 공문서 지침 준수 여부 등의 보완점을 사전 검토하는 용도로 만들어졌습니다.<br>일부 내용은 정확하지 않을 수 있으며, 반드시 기안자가 최종 확인 후 진행하여 주시기 바랍니다.<br><br>
     <b>개인정보보호 및 보안:</b> 입력된 내용 중 개인정보를 규칙에 의해 체크하여 마스킹한 뒤 점검을 진행합니다.<br>
     또한 모든 입력값은 이 브라우저 안에서만 처리되며, 외부 전송은 없습니다.<br>
     (AI 추출 사용을 하는 경우에는 개인정보가 마스킹된 입력내용이 AI 서버로 넘어가오니<br>
@@ -216,6 +220,10 @@
   <!-- ④ 결과 -->
   <section class="card hidden" id="c4">
     <h2>④ 점검 결과</h2>
+    <div class="cat-tabs" id="catTabs" role="tablist">
+      <button data-cat="budget" class="on">혁신 예산 지침</button>
+      <button data-cat="doc">공문서 작성지침</button>
+    </div>
     <div class="summary" id="sumBox"></div>
     <table id="tblResult">
       <thead><tr><th style="width:90px">판정</th><th style="width:150px">항목</th><th>내용</th><th style="width:240px">근거</th></tr></thead>
@@ -227,7 +235,11 @@
       <span class="note" id="copyMsg"></span>
       <button id="btnHome" style="margin-left:auto">초기 화면으로 돌아가기</button>
     </div>
-    <div class="excl">
+    <div class="excl" id="exclDoc" style="display:none">
+      <b>기준</b> · 인사-1782(2025. 9. 23.) 공문서 표본 및 설명자료<br>
+      <b>검증하지 않는 항목</b> · 칸 수(2타·4타·6타), 첫째 항목 사이 줄 띄움, 줄 정렬·양쪽 정렬, 표 크기·테두리(이중 실선) 등 서식 — 붙여넣은 글자만으로는 확인할 수 없어 한글 문서에서 직접 확인 · 문서 제목은 본문에 '제목' 줄이 있을 때만 점검
+    </div>
+    <div class="excl" id="exclBudget">
       <b>검증하지 않는 항목</b> · 예산 사업명과 실행과제 명칭 일치(학교 예산 특성상 제외) · 예산 계정목(예산팀 대외비 기준) · 첨부파일 내용(볼 수 없으므로 '첨부 확인' 안내만 표시)<br>
       <b>보류</b> · 사업비 구성항목의 비목 적합성(참고자료 확보 후 추가) · 기념품 1인당 한도(예산조정팀으로 문의)
     </div>
@@ -1849,6 +1861,140 @@ const AI_SYSTEM = `너는 한국외국어대학교 대학혁신지원사업 시�
 - attach: 붙임 목록의 문서 이름(번호·부수 제외)
 - notes: 읽기 애매했던 부분이 있으면 한두 문장, 없으면 ""`;
 
+/* ───────── 공문서 작성지침 점검 (인사-1782(2025. 9. 23.) 공문서 표본 및 설명자료) ─────────
+   붙여넣은 글자만으로 확인할 수 있는 표기만 본다. 칸 수(2타·4타)·표 테두리·정렬은 제외 */
+const DOC = '공문서 표본 및 설명자료(인사-1782) · ';
+function docChecks(text){
+  const out = [];
+  const add = (lv, item, msg, basis) => out.push({lv, item, msg, basis:DOC + basis, cat:'doc'});
+  let t = String(text || '').replace(/[ 　]/g, ' ').replace(/[∼～]/g, '~');
+  if (!t.trim()) return out;
+  // 본문은 마지막 '끝' 까지 (결재선·발신 정보 제외)
+  const ends = [...t.matchAll(/끝\s*\.?/g)];
+  const endM = ends.length ? ends[ends.length - 1] : null;
+  const body = endM ? t.slice(0, endM.index + endM[0].length) : t;
+  const L = body.split(/\r?\n/);
+  const clip = s => { s = s.trim().replace(/\s+/g, ' '); return s.length > 40 ? s.slice(0, 40) + '…' : s; };
+  // 정규식에 걸린 부분을 예시로 모음(같은 예시는 한 번만, 최대 3개)
+  const hits = (re, fmt = m => clip(m[0])) => [...new Set([...body.matchAll(re)].map(fmt))];
+  // 걸린 부분 앞뒤 몇 글자를 같은 줄 안에서 보여 줌
+  const ctx = m => { const a = body.lastIndexOf('\n', m.index) + 1; let b = body.indexOf('\n', m.index + m[0].length); if (b < 0) b = body.length;
+    return clip(body.slice(Math.max(a, m.index - 8), Math.min(b, m.index + m[0].length + 8))); };
+  const ex = arr => arr.slice(0, 3).map(s => ' ▸ ' + s).join('') + (arr.length > 3 ? ` ▸ 외 ${arr.length - 3}곳` : '');
+
+  // 1. 제목
+  const tl = L.map(l => l.match(/^\s*제\s*목\s*[:：]?\s*(.+)$/)).find(Boolean);
+  if (tl){
+    if (/에\s*(관한|대한)\s*(일|건)\s*$/.test(tl[1])) add('warn', '문서 제목', `제목을 '~에 관한 일'로 끝내지 말고 내용을 알 수 있게 간단·명확하게 쓰세요 ▸ ${clip(tl[1])}`, '제목');
+    else add('ok', '문서 제목', `'~에 관한 일' 표기 없음 ▸ ${clip(tl[1])}`, '제목');
+  }
+
+  // 2. 관련 근거 표기
+  const rel = hits(/관련\s*근거/g);
+  if (rel.length) add('warn', '관련 표기', `'관련근거' 대신 '관련:'으로 통일하세요${ex(rel)}`, '관련 근거 표기');
+  const relWeak = hits(/위\s*(?:\(?호\)?)?\s*(?:와|과)?\s*관련\s*,|위\s*(?:\(?호\)?)?\s*(?:와|과)\s*관련하여\s*,/g);
+  if (relWeak.length) add('warn', '관련 언급', `'위와 관련,'·'위 호 관련,' 대신 '위 호와 관련하여'(뒤에 쉼표 없음)로 쓰거나 관련 언급 없이 바로 본문을 쓰세요${ex(relWeak)}`, '관련 언급');
+  // 문서번호(날짜)와 인용 제목: 한 칸 띄우고 큰따옴표
+  const cite = [...body.matchAll(/[가-힣A-Za-z]+-\d+\s*\(([^)]*\d[^)]*)\)(\s*)(\S?)/g)];
+  const citeBad = cite.filter(m => m[3] && !/[,.\s]/.test(m[3]) && (!m[2] || !/["“'‘]/.test(m[3]))).map(m => clip(m[0]));
+  if (citeBad.length) add('warn', '관련 문서 인용', `문서번호(생산일)와 제목 사이를 한 칸 띄우고 제목은 큰따옴표로 묶으세요. 예: 인사-856(2025. 4. 28.) "○○○"${ex(citeBad)}`, '관련 문서 표기');
+
+  // 3. 법령·규정 표기
+  const dbl = hits(/『[^』]*(법|령|규정|규칙|지침|협약서?|기준)』/g);
+  if (dbl.length) add('warn', '규정명 낫표', `법령·규정 이름은 홑낫표(「 」)로 묶으세요. 겹낫표(『 』)는 도서 제목에만 씁니다${ex(dbl)}`, '법령·규정 표기');
+  const noQ = hits(/(?<![「가-힣])([가-힣]{2,}(?:법|시행령|시행규칙|규정|규칙|지침))\s*제\s*\d+\s*조/g, m => `${m[1]} → 「${m[1]}」`);
+  if (noQ.length) add('info', '규정명 낫표', `조문을 인용할 때 법령·규정 이름 앞뒤에 홑낫표(「 」)를 쓰세요${ex(noQ)}`, '법령·규정 표기');
+  const art = hits(/제\s*\d+\s*조(?:\s+제?\s*\d+\s*(?:항|호)|제?\d+\s*(?:항|호)(?:\s+제?\s*\d+\s*호)?)/g)
+    .filter(s => /\s|조\d|항\d/.test(s.replace(/^제\s*/, '')) || /조\s*\d/.test(s));
+  const artNo = L.filter(l => /법|령|규정|규칙|협약|지침/.test(l)).flatMap(l => [...l.matchAll(/(?<![제\d.])\d+\s*조(?![원직])/g)].map(m => clip(m[0])));
+  const artAll = [...new Set([...art, ...artNo])];
+  if (artAll.length) add('warn', '조·항·호 표기', `'제'를 생략하지 말고 붙여 쓰세요. 예: 제79조제1항제2호${ex(artAll)}`, '장·조·항·호 표기');
+
+  // 4. 항목 기호·쌍점
+  const itemNoSp = L.filter(l => /^\s*(?:\d{1,2}\.|[가-하]\.|\d{1,2}\)|[가-하]\)|\([1-9]\d?\)|\([가-하]\))(?=[가-힣A-Za-z「“"(\[])/.test(l)).map(clip);
+  if (itemNoSp.length) add('warn', '항목 기호 띄어쓰기', `항목 기호(1., 가., 1) 등) 다음은 한 칸 띄우세요${ex(itemNoSp)}`, '항목 기호');
+  const colonBefore = hits(/[가-힣A-Za-z)\]]+\s+:(?!\d)/g);
+  const colonAfter = hits(/[가-힣A-Za-z)\]]+:(?=[^\s\d/\\])/g);
+  if (colonBefore.length || colonAfter.length) add('warn', '쌍점(:) 띄어쓰기', `쌍점은 앞말에 붙이고 뒤는 한 칸 띄우세요. 예: 대상 인원: 2명${ex([...colonBefore, ...colonAfter])}`, '쌍점');
+  else if (/:/.test(body)) add('ok', '쌍점(:) 띄어쓰기', '쌍점 앞뒤 띄어쓰기가 맞습니다', '쌍점');
+  const spaced = L.map(l => l.match(/^\s*(?:(?:\d{1,2}|[가-하])[.)]\s*)?([가-힣](?:\s+[가-힣]){1,4})\s*:/)).filter(m => m && m[1] !== '붙 임').map(m => `${m[1]} → ${m[1].replace(/\s+/g, '')}`);
+  if (spaced.length) add('warn', '항목명 글자 띄움', `줄을 맞추려고 글자 사이를 띄우지 마세요(지 원 액 ×)${ex(spaced)}`, '띄어쓰기');
+
+  // 5. 날짜·시각·기간
+  const DW = '[일월화수목금토]';
+  const dateBad = [];
+  for (const m of body.matchAll(/(?<![\d-])(20\d{2})\s*([.\-/])\s*(\d{1,2})\s*\2\s*(\d{1,2})(?:\s*\.)?(?!\d)/g)){
+    const [y, mo, d] = [m[1], +m[3], +m[4]];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
+    const good = `${y}. ${mo}. ${d}.`;
+    if (m[0].trim().replace(/\s+/g, ' ') !== good) dateBad.push(`${m[0].trim()} → ${good}`);
+  }
+  // '2026년 9월 16일 수요일'처럼 글자로 쓴 날짜 (연·월만 쓴 '2026년 9월'은 허용)
+  for (const m of body.matchAll(new RegExp(`(?:(20\\d{2})\\s*년\\s*)?(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일(?:\\s*\\(?\\s*(${DW})(?:요일)?\\s*\\)?)?`, 'g'))){
+    const good = `${m[1] ? m[1] + '. ' : ''}${+m[2]}. ${+m[3]}.${m[4] ? `(${m[4]})` : ''}`;
+    dateBad.push(`${m[0].trim()} → ${good}`);
+  }
+  const dowLong = hits(new RegExp(`\\d\\.\\s*${DW}요일`, 'g'), m => `${m[0]} → 요일은 괄호 안 한 글자로`);
+  const dates = [...new Set([...dateBad, ...dowLong])];
+  if (dates.length) add('warn', '날짜 표기', `날짜는 연·월·일 글자를 빼고 온점으로, 앞자리 0 없이, 온점 다음 한 칸 띄워 씁니다. 예: 2025. 1. 6.(월) (연·월만 쓸 때는 '2025년 1월' 허용)${ex(dates)}`, '날짜 표기');
+  else if (/20\d{2}\.\s\d/.test(body)) add('ok', '날짜 표기', '날짜 표기(2025. 1. 6.)가 맞습니다', '날짜 표기');
+  const dtComma = hits(/\.\s*(?:\([일월화수목금토]\))?\s*,\s*\d{1,2}:\d{2}/g, ctx);
+  if (dtComma.length) add('warn', '일자·시각', `일자와 시각 사이에 쉼표를 넣지 마세요. 예: 2025. 1. 11.(토) 09:00${ex(dtComma)}`, '날짜 표기');
+  const tilde = hits(/\S+\s+~\s*\S+|\S+~\s+\S+/g);
+  if (tilde.length) add('warn', '물결표(~)', `물결표 앞뒤는 붙여 씁니다. 예: 10:30~12:00, 2025. 1. 6.(월)~10.(금)${ex(tilde)}`, '기간 표기');
+
+  // 6. 금액·산출 내용
+  const amtLines = L.filter(l => /(소요\s*예산|총\s*액|구매\s*금액|계약\s*금액|지원\s*액|사업비)\s*[:：]/.test(l) && /\d{1,3}(,\d{3})+\s*원/.test(l));
+  const amtBad = [];
+  amtLines.forEach(l => {
+    const a = l.match(/(금?)\s*(\d{1,3}(?:,\d{3})+)\s*원\s*(\(([^)]*)\))?/);
+    if (!a) return;
+    const probs = [];
+    if (!a[1]) probs.push('숫자 앞에 \'금\'');
+    else if (/금\s+\d/.test(a[0])) probs.push('\'금\'과 숫자 붙여 쓰기');
+    if (!a[3] || !/^금?[일이삼사오육칠팔구십백천만억\s]+원$/.test(a[4] || '')) probs.push('숫자 다음 괄호에 한글 금액');
+    else if (/\s/.test(a[4]) || !/^금/.test(a[4])) probs.push('한글 금액은 \'금\'으로 시작해 붙여 쓰기');
+    if (probs.length) amtBad.push(`${clip(a[0])} (${probs.join(', ')})`);
+  });
+  if (amtBad.length) add('warn', '금액 표기', `금액은 아라비아 숫자 다음 괄호에 한글로 씁니다. 예: 금1,100,000원(금일백일십만원)${ex(amtBad)}`, '금액 표기');
+  else if (amtLines.length) add('ok', '금액 표기', '금액 표기(금○○원(금○○원))가 맞습니다', '금액 표기');
+  const calcWord = hits(/산출\s*내역/g);
+  if (calcWord.length) add('warn', '산출 내용', `'산출 내역' 대신 '산출 내용'으로 쓰세요${ex(calcWord)}`, '금액 표기');
+  const opX = hits(/[\d원명회개인권부식시간일박]\s*[xX*＊]\s*\d[\d,]*/g, ctx);
+  if (opX.length) add('warn', '곱셈 기호', `곱셈은 영문 x나 *가 아닌 수학 연산자 '×'(Ctrl+F10 문자표)로 쓰세요${ex(opX)}`, '산출 내용');
+  const opSp = hits(/[\d원명회개인권부식시간일박]\s+[×=]\s*[\d금]|[\d원명회개인권부식시간일박][×=]\s+[\d금]|\d\s+\+\s*\d|\d\+\s+\d/g, ctx);
+  if (opSp.length) add('warn', '연산 기호 띄어쓰기', `산출 내용의 =, +, ×는 앞뒤를 붙여 씁니다. 예: 100만원×2명=2,000,000원${ex(opSp)}`, '산출 내용');
+
+  // 7. 붙임·끝
+  const attHead = hits(/^\s*붙\s+임|^\s*붙임\s*[:：]/gm);
+  if (attHead.length) add('warn', '붙임 표기', `'붙임'은 붙여 쓰고 쌍점 없이 두 칸 띄운 뒤 목록을 씁니다(붙 임 ×, 붙임: ×)${ex(attHead)}`, '붙임');
+  const attStart = L.findIndex(l => /^\s*붙\s*임/.test(l));
+  if (attStart >= 0){
+    const noDot = L.slice(attStart).filter(l => /\d+\s*부(?!\s*\.)/.test(l)).map(clip);
+    if (noDot.length) add('warn', '붙임 마침표', `붙임은 항목마다 마침표를 찍습니다. 예: 관련 공문 사본 1부.${ex(noDot)}`, '붙임');
+    const glued = L.slice(attStart).filter(l => /부\.\s?끝/.test(l)).map(clip);
+    if (glued.length) add('warn', "'끝' 띄어쓰기", `마지막 마침표 다음 두 칸 띄우고 '끝.'을 씁니다. 예: 관련 공문 사본 1부.  끝.${ex(glued)}`, '붙임');
+  }
+  if (!endM) add('warn', "'끝' 표시", "본문(또는 붙임) 마지막에 '끝.'이 보이지 않습니다. 붙여넣기에서 빠진 것인지 확인하세요", "'끝' 표시");
+  else if (!/\.\s*$/.test(endM[0])) add('warn', "'끝' 표시", "'끝' 다음에 마침표를 찍어 '끝.'으로 쓰세요", "'끝' 표시");
+  else {
+    const before = body.slice(Math.max(0, endM.index - 6), endM.index);
+    if (/(^|\n)\s*\.\s*$/.test(before)) add('warn', "'끝' 표시", "'끝' 앞에 마침표만 따로 찍지 마세요(.  끝. ×). 표로 본문이 끝나면 표 아래 왼쪽에서 두 칸 띄우고 '끝.'만 씁니다", "'끝' 표시");
+    else add('ok', "'끝' 표시", "본문 끝에 '끝.' 표시가 있습니다", "'끝' 표시");
+  }
+
+  // 8. 용어·띄어쓰기
+  const ref = hits(/(?<!수신자\s*[:：(]?\s*)참조(?!\s*\))/g, ctx);
+  if (ref.length) add('warn', "'참고' 표기", `'참조' 대신 '참고'를 씁니다. 예: [붙임 1] 참고${ex(ref)}`, '용어');
+  const uri = hits(/우리(대학교?|학교|기관|학과|학부|부서|팀|처|원)/g, m => `${m[0]} → 우리 ${m[1]}`);
+  if (uri.length) add('warn', "'우리' 띄어쓰기", `'우리'는 우리나라·우리글·우리말만 붙여 씁니다${ex(uri)}`, '띄어쓰기');
+  const below = hits(/아래(와|과)\s*같이/g);
+  if (below.length) add('info', '권장 표현', `'아래와 같이'보다 '다음과 같이'를 권장합니다${ex(below)}`, '권장 표현');
+  const total1 = hits(/총\s*1\s*명/g);
+  if (total1.length) add('info', '인원 표기', `1명이면 '총'을 붙일 필요가 없습니다${ex(total1)}`, '인원 표기');
+  return out;
+}
+
 function buildAiRequest(model, maskedText){
   const body = {
     model, max_tokens:16000,
@@ -2211,24 +2357,46 @@ function readForm(){
 }
 
 const LV = {err:['🔴 확인 필요','err'], warn:['🟡 보완','warn'], ok:['🟢 적합','ok'], info:['ℹ️ 안내','info']};
+// 점검 결과 분류: 혁신 예산 지침 / 우리 대학 공문서 작성지침
+const CATS = {budget:'혁신 예산 지침', doc:'공문서 작성지침'};
+let curCat = 'budget';
+const lvCount = list => { const c = {err:0, warn:0, info:0, ok:0}; list.forEach(r => c[r.lv]++); return c; };
+function renderResults(){
+  const list = results.filter(r => r.cat === curCat);
+  const cnt = lvCount(list);
+  document.querySelectorAll('#catTabs button').forEach(b => {
+    const k = b.dataset.cat, c = lvCount(results.filter(r => r.cat === k));
+    b.classList.toggle('on', k === curCat);
+    b.innerHTML = `${CATS[k]} <span class="cnt">${['err','warn','info'].filter(x => c[x]).map(x => LV[x][0].split(' ')[0] + c[x]).join(' ') || '🟢 이상 없음'}</span>`;
+  });
+  $('sumBox').innerHTML = ['err','warn','info','ok'].map(k => `<span class="lv ${k}">${LV[k][0]} ${cnt[k]}</span>`).join('');
+  $('tblResult').querySelector('tbody').innerHTML = list.map(r =>
+    `<tr><td><span class="lv ${LV[r.lv][1]}">${LV[r.lv][0]}</span></td><td>${esc(r.item)}</td><td>${esc(r.msg).replace(/ ▸ /g, '<br>▸ ')}</td><td class="basis">${esc(r.basis)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="note">점검할 내용이 없습니다.</td></tr>';
+  $('exclBudget').style.display = curCat === 'budget' ? '' : 'none';
+  $('exclDoc').style.display = curCat === 'doc' ? '' : 'none';
+}
 function doCheck(){
-  results = runChecks(readForm());
+  const f = readForm();
+  results = runChecks(f).map(r => ({...r, cat:'budget'})).concat(docChecks(f.text));
   const order = {err:0, warn:1, info:2, ok:3};
   results.sort((a, b) => order[a.lv] - order[b.lv]);
-  const cnt = {err:0, warn:0, info:0, ok:0}; results.forEach(r => cnt[r.lv]++);
-  $('sumBox').innerHTML = ['err','warn','info','ok'].map(k => `<span class="lv ${k}">${LV[k][0]} ${cnt[k]}</span>`).join('');
-  $('tblResult').querySelector('tbody').innerHTML = results.map(r =>
-    `<tr><td><span class="lv ${LV[r.lv][1]}">${LV[r.lv][0]}</span></td><td>${esc(r.item)}</td><td>${esc(r.msg).replace(/ ▸ /g, '<br>▸ ')}</td><td class="basis">${esc(r.basis)}</td></tr>`).join('');
+  curCat = 'budget';
+  renderResults();
   $('copyMsg').textContent = '';
   stepOn(4);
 }
+document.querySelectorAll('#catTabs button').forEach(b => b.onclick = () => { curCat = b.dataset.cat; renderResults(); });
 
 function doCopy(){
   const name = $('fName').value || '시행기안';
   const items = results.filter(r => r.lv !== 'ok');
   if (!items.length){ $('copyMsg').textContent = '보완할 항목이 없습니다.'; return; }
-  const text = `[사전점검] ${name}\n\n` + items.map((r, i) =>
-    `${i + 1}. ${LV[r.lv][0].replace(/^\S+\s/, '')} · ${r.item}\n   ${r.msg.replace(/ ▸ /g, '\n   ▸ ')}${r.basis ? `\n   (근거: ${r.basis})` : ''}`).join('\n');
+  const text = `[사전점검] ${name}\n` + Object.keys(CATS).map(k => {
+    const its = items.filter(r => r.cat === k);
+    return its.length ? `\n■ ${CATS[k]}\n` + its.map((r, i) =>
+      `${i + 1}. ${LV[r.lv][0].replace(/^\S+\s/, '')} · ${r.item}\n   ${r.msg.replace(/ ▸ /g, '\n   ▸ ')}${r.basis ? `\n   (근거: ${r.basis})` : ''}`).join('\n') : '';
+  }).join('\n');
   navigator.clipboard.writeText(text).then(() => $('copyMsg').textContent = '복사했습니다.', () => {
     const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); ta.remove(); $('copyMsg').textContent = '복사했습니다.';
