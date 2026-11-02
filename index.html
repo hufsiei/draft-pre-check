@@ -289,7 +289,7 @@ function lectLimit(g, h){
   return L.first + Math.max(0, Math.ceil(h || 1) - 1) * L.extra;
 }
 const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유홍전고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부가복태목형피두감음빈동온호범좌팽승간상갈시견당';
-const STOP = ['우리대학','한예종','대학별','관계자','참석자','담당자','협약','행사','기념','외부','내부','전체','각','본교','연번','순번','번호'];   // 표 머리 '연번'은 이름 아님(성 '연'과 겹침)
+const STOP = ['우리대학','한예종','대학별','관계자','참석자','담당자','협약','행사','기념','외부','내부','전체','각','본교','연번','순번','번호','이하인','이상인','미만인','초과인','문서'];   // 표 머리 '연번'은 이름 아님(성 '연'과 겹침)
 const TITLE = '[가-힣]*(?:부총장|총장|처장|원장|센터장|팀장|교수|과장|학장|부장|실장|위원장|위원|단장|소장|국장|차장|대표|이사장|이사|주임|연구원|강사|조교|주무관|사무관|교장|교감|교사)';
 
 /* ───────── 유틸 ───────── */
@@ -751,6 +751,16 @@ function parseBudgetTable(text){
       rows.push(makeRow(cur[0], [...cur.slice(1), qty ? `${fmt(money(t))}원 × ${qty}` : `단가 ${fmt(money(t))}원`], amt, note, mult)); cur = [];
       continue;
     }
+    if (isAmt && cur.length && !hc.some(h => /^단가/.test(h)) && AMT_RE.test(nextTok(k))){
+      // 묶음 소계 칸: '운영비 | 식대 | 1,850,000(소계) | 1,000,000 | …', 이어지는 행 금액을 앞에서부터 더해 소계와 같으면 소계로 보고 건너뜀
+      const sub = money(t); let acc = 0, ok = false;
+      for (let q = k + 1; q < body.length; q++){
+        const x = body[q];
+        if (x && (TOTAL_RE.test(x.replace(/\s+/g, '')) || SUBTOTAL_RE.test(x))) break;
+        if (x && AMT_RE.test(x) && money(x) >= 100){ acc += money(x); if (acc === sub){ ok = true; break; } if (acc > sub) break; }
+      }
+      if (ok && money(nextTok(k)) < sub){ if (cur.length > 1) cur = [cur[cur.length - 1]]; continue; }
+    }
     if (isAmt && cur.length){
       let note = ''; const extra = [];
       // 금액 열 뒤의 칸 읽기: 계약자·업체 같은 열은 자리대로, 비고는 짧은 메모일 때만
@@ -761,6 +771,13 @@ function parseBudgetTable(text){
         if (/^비고/.test(col)){
           if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx))){ note = nx; k++; }
         } else { if (nx) extra.push(`${col} ${nx}`); k++; }
+      }
+      // 산출근거·비고 칸이 여러 줄('- …', '※ …', 식)이면 다음 행 이름으로 넘기지 않고 이어서 붙임
+      if (trailCols.length) while (k + 1 < body.length){
+        const nx = body[k + 1];
+        if (!nx || AMT_RE.test(nx) || TOTAL_RE.test(nx.replace(/\s+/g, '')) || SUBTOTAL_RE.test(nx)) break;
+        if (!/^[-–·•※*]\s*\S|^\d[\d,.]*\s*(만\s*)?원?\s*[×xX*]\s*\d/.test(nx)) break;
+        extra.push(nx); k++;
       }
       rows.push(makeRow(cur[0], [...cur.slice(1), ...extra], money(t), note, mult)); cur = [];
     } else if (eqAmt){
@@ -1042,6 +1059,15 @@ function extract(masked){
   // 사업명이 '○○ 용역'·'○○ 공사'면 분야별 행(건축·전기 등)도 그 유형으로
   const docKind = /용역/.test(out.name) ? 'service' : /공사/.test(out.name) ? 'construction' : '';
   if (docKind) out.rows.forEach(r => { if (r.type === 'goods') r.type = docKind; });
+  // 장학금 등급별 지급(안) 표(등급 | 비율 | 1인당 금액 | 인원 | 총 지급액): 앞의 '산정 기준' 표보다 우선, 장학금 한 행으로 묶고 구간별 식을 산출근거로
+  const sg = /장학/.test(all) ? parseScholarshipGrid(L) : null;
+  if (sg){
+    const n = sg.rows.reduce((a, r) => a + r.qty, 0), s = sg.rows.reduce((a, r) => a + r.amt, 0);
+    out.rows = [{content:'장학금', type:'scholarship', unit:'', qty:String(n), amount:fmt(sg.total || s), grade:'', hours:'',
+                 basis:sg.rows.map(r => `${r.label} ${fmt(r.unit)}원×${r.qty}명=${fmt(r.amt)}원`).join(' / ')}];
+    out.sum = fmt(sg.total || s);
+    out.schGrid = {count:n, statedCount:sg.count, sum:s, total:sg.total, zero:sg.zero};
+  }
 
   // 구매 기안: 품목 표, 비교견적 표, 구매업체
   out.items = parseItems(L);
@@ -1057,6 +1083,13 @@ function extract(masked){
   const bv = all.match(/구매\s*업체\s*[:：]\s*(.+)/);
   out.buyVendor = bv ? bv[1].trim() : '';
   if (!out.name && out.items.length) out.name = out.items[0].name + (out.items.length > 1 ? ` 외 ${out.items.length - 1}종 구매` : ' 구매');
+  // 그래도 없으면 문서 제목에서: '[대학혁신지원사업] ○○ 지급에 관한 일' → '○○ 지급'
+  if (!out.name){
+    const ti = L.findIndex(l => /^제\s*목\s*[:：]?/.test(l));
+    const t = ti < 0 ? '' : (L[ti].replace(/^제\s*목\s*[:：]?\s*/, '') || L[ti + 1] || '');
+    out.name = t.replace(/^\[[^\]]*\]\s*/, '').replace(/\s*(에\s*관한\s*(일|건)|의\s*건|건)\s*$/, '').trim();
+  }
+  if (out.rows.length === 1 && out.rows[0].type === 'scholarship' && out.rows[0].content === '장학금' && out.name) out.rows[0].content = out.name;
 
   // 소요예산: "소요예산: 1,650,000원(금일백…)" 또는 "3. 소요예산 / 가. 금액: 금11,340,000원"
   // 총액 줄: '소요예산'을 먼저 찾고, 없으면 구매·계약·공사금액 등. 금액이 '원'으로 적힌 줄만(인용문 속 '3,000만원 이하' 같은 기준 금액 제외)
@@ -1177,6 +1210,37 @@ function parseDeptTables(L){
     i = j;
   }
   return out;
+}
+
+// 장학금 지급(안) 표: 머리줄에 '1인당'·'인원'·'지급액(금액)'이 있고, 행마다 '1인당 금액 → 인원 → 총액'이 이어짐
+// 앞쪽 등급 글자(A·B, 가·나)와 비율(100%)은 행 이름으로. 인원 '-'인 구간은 빈 구간
+function parseScholarshipGrid(L){
+  const h = L.findIndex(l => /^1\s*인당/.test(l));
+  if (h < 0) return null;
+  const head = L.slice(h, h + 4);
+  if (!head.some(l => /^인\s*원/.test(l)) || !head.some(l => /지급액|총\s*액|금\s*액/.test(l))) return null;
+  let k = h + 1; while (k < L.length && /^(인\s*원.*|.*지급액.*|총\s*액.*|금\s*액.*)$/.test(L[k])) k++;   // 나머지 머리줄 건너뜀
+  const isMoney = s => /^\d{1,3}(,\d{3})+$/.test(s || ''), isCnt = s => /^(\d+|-)$/.test(s || ''), isAmt = s => isMoney(s) || s === '-';
+  const rows = []; let big = '', small = '', pct = '', zero = 0, total = 0, count = 0;
+  for (; k < L.length; k++){
+    const l = L[k];
+    if (/^(총\s*계|합\s*계|계)$/.test(l)){
+      const nums = L.slice(k + 1, k + 6).filter(s => /^[\d,]+$/.test(s));
+      count = nums.find(s => !s.includes(',')) ? +nums.find(s => !s.includes(',')) : 0;
+      total = nums.find(isMoney) ? num(nums.find(isMoney)) : 0;
+      break;
+    }
+    if (isMoney(l) && isCnt(L[k + 1]) && isAmt(L[k + 2])){
+      if (L[k + 1] === '-') zero++;
+      else rows.push({label:big + small + (pct ? `(${pct})` : ''), unit:num(l), qty:+L[k + 1], amt:L[k + 2] === '-' ? 0 : num(L[k + 2])});
+      k += 2; small = ''; pct = ''; continue;
+    }
+    if (/^[A-Z]$/.test(l)) big = l;
+    else if (/^[가-하]$/.test(l)) small = l;
+    else if (/^\d+(\.\d+)?%$/.test(l)) pct = l;
+    else if (/^[가-힣]/.test(l) && l.length > 8) break;   // 표가 끝나고 본문이 시작되면 멈춤
+  }
+  return rows.length >= 2 ? {rows, total, count, zero} : null;
 }
 
 function parseAttachments(L){
@@ -1443,7 +1507,7 @@ function runChecks(f){
     // 기안문의 수의계약 사유가 구매규정 제11조제1항 몇 호에 해당하는지(1인 견적 가능 사유: 제9조제1항제1호)
     ho: /설치\s*[·ㆍ‧]?\s*조립|직접\s*[^.\n]{0,20}정비/.test(T) ? 12 : /특허|실용\s*신안|디자인\s*등록/.test(T) ? 1
       : /생산자\s*또는\s*소지자|단일\s*(업체|공급)|유일한|독점/.test(T) ? 2 : /호환/.test(T) ? 3 : /특정인의\s*(기술|품질|경험|자격)|학술\s*연구/.test(T) ? 4 : 0,
-    bid: ((T.match(/(일반|제한|지명)\s*경쟁\s*입찰|협상에\s*의한\s*계약|적격\s*심사/) || [''])[0]).replace(/\s+/g, '')
+    bid: ((T.match(/(일반|제한|지명)\s*경쟁\s*입찰|협상에\s*의한\s*계약|적격\s*심사|입찰\s*(진행|예정|공고|을\s*통해|로\s*진행|방식)/) || [''])[0]).replace(/\s+/g, '').replace(/^입찰.*/, '입찰')
   };
 
   // 항목별 기준
@@ -1611,7 +1675,15 @@ function runChecks(f){
     if (r.type === 'scholarship'){
       const B = G + '32쪽, 67쪽';
       // 지급 기준·대상 선정 절차
-      if (/선발|선정|추천|심사|평가/.test(T)) add('ok', `${label} 선정 절차`, '지급 대상 선발(선정) 방식이 적혀 있습니다. 교내 장학금 지급 기준과 선정 절차를 확인할 수 있는 자료를 갖추세요', B);
+      // 소득구간·파견국가별 차등 지급처럼 신청 자격·지급 기준을 적은 것도 선정 기준으로 인정
+      const crit = T.match(/선발|선정|추천|심사|평가|신청\s*(기준|자격)|지원\s*자격|자격\s*요건|지급\s*(기준|대상자?\s*[:：])|산정\s*기준|소득\s*구간|성적\s*기준|차등\s*지급/g);
+      // 지급(안) 표의 인원 합 = 본문 '총 N명'
+      const cm = T.match(/총\s*(\d+)\s*명/);
+      if (cm && r.qty && /×/.test(r.basis)){
+        if (+cm[1] === +r.qty) add('ok', `${label} 인원`, `지급(안) 표의 인원 합 ${r.qty}명 = 본문 지급 대상 ${cm[1]}명`);
+        else add('err', `${label} 인원`, `지급(안) 표의 인원 합 ${r.qty}명과 본문 지급 대상 ${cm[1]}명이 다릅니다`);
+      }
+      if (crit) add('ok', `${label} 선정 절차`, `지급 기준·선정 방식이 적혀 있습니다(${[...new Set(crit.map(s => s.replace(/\s*[:：]$/, '')))].slice(0, 4).join(', ')}). 교내 장학금 지급 기준과 선정 절차를 확인할 수 있는 자료를 갖추세요`, B);
       else add('warn', `${label} 선정 절차`, '장학금은 대학 내 지급 기준과 대상 선정 절차를 거쳐 지급해야 합니다. 선발 방식과 기준을 적으세요', B);
       // 참여 대상 전원 지급형
       if (/전원|모든\s*(참여자|참가자|학생)|참가자\s*전체/.test(T))
@@ -2010,7 +2082,7 @@ function docChecks(text){
   // 5. 날짜·시각·기간
   const DW = '[일월화수목금토]';
   const dateBad = [];
-  for (const m of body.matchAll(/(?<![\d-])(20\d{2})\s*([.\-/])\s*(\d{1,2})\s*\2\s*(\d{1,2})(?:\s*\.)?(?!\d)/g)){
+  for (const m of body.matchAll(/(?<![\d-])(20\d{2})[ \t]*([.\-/])[ \t]*(\d{1,2})[ \t]*\2[ \t]*(\d{1,2})(?![\d)])(?:[ \t]*\.)?(?!\d)/g)){
     const [y, mo, d] = [m[1], +m[3], +m[4]];
     if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
     const good = `${y}. ${mo}. ${d}.`;
@@ -2048,7 +2120,8 @@ function docChecks(text){
   });
   if (amtBad.length) add('warn', '금액 표기', `금액은 아라비아 숫자 다음 괄호에 한글로 씁니다. 예: 금1,100,000원(금일백일십만원)${ex(amtBad)}`, '금액 표기');
   else if (amtLines.length) add('ok', '금액 표기', '금액 표기(금○○원(금○○원))가 맞습니다', '금액 표기');
-  const calcWord = hits(/산출\s*내역/g);
+  // 표 머리 칸에 '산출내역'만 있는 줄(사업비 구성 항목 서식의 열 제목)은 제외
+  const calcWord = hits(/^.*산출\s*내역.*$/gm, m => /^\s*산출\s*내역\s*$/.test(m[0]) ? null : clip(m[0].match(/산출\s*내역/)[0])).filter(Boolean);
   if (calcWord.length) add('warn', '산출 내용', `'산출 내역' 대신 '산출 내용'으로 쓰세요${ex(calcWord)}`, '금액 표기');
   // 금액·산출식이 있는 줄만('3840x2160' 같은 해상도·규격은 제외)
   const opX = hits(/[\d원명회개인권부식시간일박]\s*[xX*＊]\s*\d[\d,]*/g, m => {
