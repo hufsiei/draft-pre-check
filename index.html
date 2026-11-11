@@ -613,7 +613,7 @@ function parseGrade(s){
 }
 
 /* ───────── 예산내역·산출내역·세부내역 표 읽기 ───────── */
-const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|소요\s*예산|단가|수량|인원|횟수|비고(?:\(.*\))?|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|모델명\(규격\)|규격\(모델\))$/i;
+const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|소요\s*예산|단가|수량|인원|횟수|비고(?:\(.*\))?|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|품목명|물품명|장비명|용도|모델명\(규격\)|규격\(모델\))$/i;
 // '구  분', '계 약 자', '비  고'처럼 글자 사이에 띄어쓰기가 있어도 열 제목으로 인식
 const HEAD_RE = {test:s => HEAD_WORDS.test(String(s).replace(/\s+/g, ''))};
 const AMT_COL = /^(금액|예산액|소요\s*예산|계약\s*금액|공사비|용역비|설계비|계$|소계$|합계$)/;   // '단가 | 수량 | 계' 표의 '계' 열도 금액 열
@@ -802,6 +802,7 @@ function parseBudgetTable(text){
   const amtPos = hc.findIndex(h => AMT_COL.test(h));
   const trailCols = amtPos >= 0 ? hc.slice(amtPos + 1) : [];   // 금액 열 뒤의 열들(계약자·비고 등)
   const hasNote = trailCols.some(h => /^비고/.test(h));
+  const hasUse = trailCols.some(h => /^용도/.test(h));   // 금액 뒤 '용도' 칸: 값이 늘 있으므로 그 행에 붙임
 
   const rows = []; let sum = '';
   const body = tok.slice(i);
@@ -870,13 +871,13 @@ function parseBudgetTable(text){
     const eqAmt = !hasAmt && (/=\s*[\d,]+\s*원?\s*$/.test(t) || SUB_AMT.test(t) || (cur.length > 0 && TAIL_AMT.test(t)));
     if (isAmt && cur.length && hc.some(h => /^단가/.test(h)) && AMT_RE.test(body[k + 1] || '') && money(body[k + 1]) >= money(t)){
       // '수량 | 단가 | 금액' 표: 이어지는 두 숫자 중 앞은 단가, 뒤는 금액, 단가 앞의 작은 정수는 수량
-      const qty = /^\d{1,4}$/.test(cur[cur.length - 1]) ? cur.pop() : '';
+      const qty = /^\d{1,4}(식|개|대|EA|set)?$/i.test(cur[cur.length - 1]) ? cur.pop() : '';
       const amt = money(body[++k]);
       let note = '';
       if (hasNote && k + 1 < body.length){
         const nx = body[k + 1];
         if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx))){ note = nx; k++; }
-      }
+      } else if (hasUse && k + 1 < body.length && body[k + 1] && !AMT_RE.test(body[k + 1]) && !TOTAL_RE.test(body[k + 1])){ note = body[++k]; }
       rows.push(makeRow(cur[0], [...cur.slice(1), qty ? `${fmt(money(t))}원 × ${qty}` : `단가 ${fmt(money(t))}원`], amt, note, mult)); cur = [];
       continue;
     }
@@ -1893,7 +1894,9 @@ const CMP_HEAD = /^(영역|영억|구분|혁신전략|프로그램|핵심과제|
 const cmpBestScore = t => Object.keys(COMPOSE_TASKS).reduce((m, k) => Math.max(m, cmpDice(cmpName(t), cmpNorm(COMPOSE_TASKS[k]))), 0);
 function cmpReadWrapped(L, k, hasArea){
   let p = k, area = '';
-  if (hasArea){ if (!(cmpAreaOf(L[p] || '') && L[p].length <= 12)) return null; area = L[p++]; }
+  if (hasArea){ if (!(cmpAreaOf(L[p] || '') && L[p].length <= 12)) return null; area = L[p++];
+    // 영역 칸이 '(A)' + '교육'처럼 두 줄로 나뉘면 붙임
+    if (/^\(?\s*[AD]\s*\)$/.test(area.trim()) && /^(교육|사업\s*관리)$/.test((L[p] || '').trim())) area += L[p++].trim(); }
   const mid = []; let b = '';
   const isNew = x => !x || /^\(?\s*\d+(\.\d+)*\s*[.)]/.test(x) || cmpBimokNo(x) || /^([가-하]|\d{1,2})[.)]?\s/.test(x) || /예산|붙\s*임/.test(x);
   while (p < L.length && mid.length <= 3){
@@ -2199,6 +2202,11 @@ function runChecks(f){
 
   // 항목별 기준
   const allText =(f.text || '') + ' ' + rows.map(r => r.content + ' ' + r.basis).join(' ');
+  // 품목 여러 개를 한 번에 구입하는 기안(모든 행이 물품)은 계약 방법을 품목별이 아니라 합계로 한 번만 판정
+  const buyRows = rows.filter(r => r.type === 'goods' && !isNaN(num(r.amount)) && !/활동\s*지원/.test(r.content));
+  // 품목 합계가 소요예산과 같을 때만(증감 표 등을 잘못 읽은 행을 더하지 않게)
+  const oneBuy = buyRows.length > 1 && rows.every(r => r.type === 'goods') && /구입|구매/.test(f.text || '')
+    && buyRows.every(r => num(r.amount) > 0) && buyRows.reduce((t, r) => t + num(r.amount), 0) === total;
   rows.forEach(r => {
     const a = num(r.amount), u = num(r.unit), q = num(r.qty);
     const label = r.content || TYPE_LABEL[r.type];
@@ -2302,7 +2310,7 @@ function runChecks(f){
         if ((f.vat ? a : a * 1.1) > 1.1e7) procure(a, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
       }
     }
-    if (r.type === 'goods' && !isNaN(a) && !/활동\s*지원/.test(r.content)) procure(a, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
+    if (r.type === 'goods' && !isNaN(a) && !oneBuy && !/활동\s*지원/.test(r.content)) procure(a, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
     if (r.type === 'construction' && !isNaN(a)) procure(a, 'construction', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
     if (r.type === 'service' && !isNaN(a)) procure(a, 'service', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
     if (r.type === 'lecture' && !(/원고료/.test(r.content) && !/특강|강사|강연|강의료/.test(r.content))){
@@ -2500,6 +2508,10 @@ function runChecks(f){
       add('info', `${label} 증빙`, '자문 수행을 확인할 수 있는 자문의견서 등의 근거서류를 구비하여 주시기 바랍니다', B34);
     }
   });
+  if (oneBuy){
+    const tot = buyRows.reduce((t, r) => t + num(r.amount), 0);
+    procure(tot, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `물품 ${buyRows.length}종 합계(${won(tot)}) 계약`, msgC(p[0], p[1]), p[2]));
+  }
 
   if (rows.some(r => (r.basis || '').startsWith(NO_DETAIL) && r.type !== 'scholarship'))
     add('info', '산출내역', `세부 산출내역 표가 없어 소요예산(구매·계약금액) 전체를 한 항목으로 점검했습니다. 견적서(붙임)로 ${(f.items || []).length > 1 ? '품목별 ' : ''}금액 근거를 확인하세요`);
@@ -2762,7 +2774,7 @@ function runChecks(f){
     if (r.lv === 'ok' && !/ 계약$/.test(r.item)) return;
     askDone.add(r.item);
     const group = R_.filter(o => o.item === r.item).map(o => o.msg).join(' ');
-    const buy = BUY_ITEM.test(r.item) || /입찰|구매|물품/.test(group);
+    const buy = BUY_ITEM.test(r.item) || /입찰|구매|물품/.test(group) || /^물품 \d+종 합계/.test(r.item);
     r.msg = r.msg.replace(/[.\s]*$/, '') + (buy ? '. 입찰·구매 절차는 예산조정팀(글로벌캠퍼스는 총괄지원팀)에 문의하세요' : '. 계약 절차는 예산조정팀에 확인하세요');
   });
   return R_;
