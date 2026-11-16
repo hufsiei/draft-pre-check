@@ -586,12 +586,12 @@ function classify(s){
   if (/운영비|진행비|제반\s*경비/.test(s)) return 'bundle';
   if (/기념품|답례품|홍보물품|경품/.test(s)) return 'gift';
   if (SURVEY_REWARD.test(s)) return 'gift';   // 만족도조사 성실답변자·우수의견 제안자에게 주는 기프티콘·기념품 (사용자 실무 기준 2026-11-05)
-  if (/식대|식사|다과|간식|도시락|오찬|만찬|회의비/.test(s)) return 'meal';
+  if (/식대|식비|식사|다과|간식|도시락|오찬|만찬|회의비/.test(s)) return 'meal';
   if (/숙박비?|교통비|항공료|항공권|여비|출장비|유류비|철도|KTX/i.test(s)) return 'travel';   // 실비 정산 경비(계약 아님)
   if (/연구\s*지원비/.test(s)) return 'bundle';   // 연구활동·프로그램을 지원하는 경비 (사용자 설명 2026-11-05)
   if (/자문료|자문비|멘토링|멘토비|멘토\s*수당|전문가\s*(활용|자문)|컨설팅비/.test(s)) return 'advice';   // 외부 전문가 활용비(지침 34쪽)
   if (/동영상|콘텐츠|이용\s*기간|이용권|라이선스|라이센스|구독/.test(s)) return 'service';   // 동영상 강의 임대 등은 특강료가 아님
-  if (/강사료|강사비|특강|강연료|강의료|원고료/.test(s)) return 'lecture';   // '특강 및 심사비'처럼 섞여 있어도 특강 기준으로 안내
+  if (/강사료|강사비|특강(?!자)|강연료|강의료|원고료/.test(s)) return 'lecture';   // '특강 및 심사비'처럼 섞여 있어도 특강 기준으로 안내
   if (/설계\s*용역|감리/.test(s)) return 'service';
   if (/교육비|수강료|위탁\s*교육|교육\s*위탁|어학\s*교육/.test(s)) return 'service';   // 교육 위탁(용역)
   if (/공사(?!비)|시공|리모델링|개보수|증축|철거|도장|방수|시설\s*개선|인테리어\s*공사/.test(s)) return 'construction';
@@ -613,10 +613,10 @@ function parseGrade(s){
 }
 
 /* ───────── 예산내역·산출내역·세부내역 표 읽기 ───────── */
-const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|소요\s*예산|결산\s*(내역|금액|액)|집행\s*(내역|금액|액)|단가|수량|인원|횟수|비고(?:\(.*\))?|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|품목명|물품명|장비명|용도|모델명\(규격\)|규격\(모델\))$/i;
+const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|세부\s*예산|소요\s*예산|결산\s*(내역|금액|액)|집행\s*(내역|금액|액)|단가|수량|인원|횟수|비고(?:\(.*\))?|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|품목명|물품명|장비명|용도|모델명\(규격\)|규격\(모델\))$/i;
 // '구  분', '계 약 자', '비  고'처럼 글자 사이에 띄어쓰기가 있어도 열 제목으로 인식
 const HEAD_RE = {test:s => HEAD_WORDS.test(String(s).replace(/\s+/g, ''))};
-const AMT_COL = /^(금액|예산액|소요\s*예산|결산\s*(금액|액)|집행\s*(금액|액)|계약\s*금액|공사비|용역비|설계비|계$|소계$|합계$)/;   // '단가 | 수량 | 계' 표의 '계' 열도 금액 열
+const AMT_COL = /^(금액|예산액|세부\s*예산|소요\s*예산|결산\s*(금액|액)|집행\s*(금액|액)|계약\s*금액|공사비|용역비|설계비|계$|소계$|합계$)/;   // '단가 | 수량 | 계' 표의 '계' 열도 금액 열
 const CODE_RE = /^[A-Z]\d{2,}(-\d+)+$/;            // 사업코드 (예: A055-25-432599)
 const NO_DETAIL = '세부 산출내역 없음(소요예산 전체)';
 const PROJ_RE = /^\[[^\]]+\]\S*$/;                 // 예산 사업명 (예: [혁신]학습역량프로그램운영비)
@@ -659,6 +659,17 @@ function parseExprs(s){
     const big = nums.reduce((a, b) => (b > a ? b : a), 0);   // 가장 큰 수를 단가로
     out.push({unit:big, factors:m[1].split(/[×*xX✕]/).map(x => x.trim()), nums:nums.filter(n => n !== big),
               product:nums.reduce((a, b) => a * b, 1), stated:num(m[2]), at:m.index, end:m.index + m[0].length});
+  }
+  // 수량이 앞이고 단가가 맨 끝인 식('= 금액' 없어도): '회차별 60명(신청자 50명, 운영진 10명) × 3개 회차 × 10,000원'
+  // 수량 뒤 괄호 설명은 같은 길이 공백으로 바꿔 읽음(위치 유지)
+  const s3 = s.replace(/(\d\s*[가-힣]{0,3})(\s*\([^()]{1,40}\))(?=\s*[×*xX✕])/g, (m, a, b) => a + ' '.repeat(b.length));
+  const re3 = /((?:\d[\d,]*\s*[가-힣]{0,3}(?:\s[가-힣]{1,3})?\s*[×*xX✕]\s*)+)(\d[\d,]*)\s*원(?!\s*[×*xX✕\d\/])(?:\s*=\s*([\d,]+)\s*원?)?/g;
+  while ((m = re3.exec(s3))){
+    if (/원/.test(m[1]) || /\d\s*분/.test(m[1]) || out.some(o => m.index < o.end && o.at < m.index + m[0].length)) continue;
+    const factors = m[1].split(/[×*xX✕]/).map(x => x.trim()).filter(Boolean);
+    const nums = factors.map(t => num((t.match(/\d[\d,]*/) || [''])[0]));
+    if (!nums.length || nums.some(isNaN)) continue;
+    out.push({unit:num(m[2]), factors, nums, product:nums.reduce((a, b) => a * b, num(m[2])), stated:m[3] ? num(m[3]) : NaN, at:m.index, end:m.index + m[0].length});
   }
   return out;
 }
@@ -819,7 +830,7 @@ function parseBudgetTable(text){
     }
     if (cur) rows.push(cur);
     // 금액 열이 산출근거 열보다 앞에 있는 표(연번 | 내용 | 금액 | 산출근거): 한 행 안에 '금액 → 근거'가 여러 번 나올 수 있음
-    const basisPos = hc.findIndex(h => /^(산출|세부)/.test(h));
+    const basisPos = hc.findIndex(h => /^(산출|세부(?!예산))/.test(h));
     if (basisPos > amtPos){
       return {rows:rows.filter(c => c.length).map(c => {
         const parts = []; let p = null;
@@ -900,7 +911,7 @@ function parseBudgetTable(text){
         if (TOTAL_RE.test(nx.replace(/\s+/g, '')) || (nx && AMT_RE.test(nx))) break;
         if (/^비고/.test(col)){
           if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx))){ note = nx; k++; }
-        } else { if (nx) extra.push(`${col} ${nx}`); k++; }
+        } else { if (nx) extra.push(/^(산출|세부|내역)/.test(col) ? nx : `${col} ${nx}`); k++; }   // 산출근거 칸은 열 이름 없이
       }
       // 산출근거·비고 칸이 여러 줄('- …', '※ …', 식)이면 다음 행 이름으로 넘기지 않고 이어서 붙임
       if (trailCols.length) while (k + 1 < body.length){
@@ -1110,14 +1121,15 @@ function parseEvals(L){
 // 일정표의 특강 줄 주변에서 강사 유형(지침 35쪽 특별강의료 기준)과 강의 시간을 추정
 // 예) '15:05~16:05' / '60'' / '서포터즈 역량강화 특강' / '서울○○초등학교 ○○○ 선생님' → Ⅳ유형(초·중·고 교사), 1시간
 function inferLecture(L){
-  const idx = L.findIndex(l => /특강|강연(?!료)|초청\s*강의/.test(l) && !/특강비|특강료|강연료|강사료|사례발표비|\d{3},\d{3}/.test(l));
+  // 문서 제목 줄('[대학혁신지원사업] … 특강 … 관한 건')은 일정표가 아님
+  const idx = L.findIndex(l => /특강|강연(?!료)|초청\s*강의/.test(l) && !/특강비|특강료|강연료|강사료|사례발표비|\d{3},\d{3}/.test(l) && !/^\s*\[[^\]]*\]|관한\s*(건|일)|하고자/.test(l));
   if (idx < 0) return null;
   const around = L.slice(idx, idx + 3).join(' ');
   const rules = [
     [/(초등|중|고등)\s*학교[^\n]{0,25}(교장|교감)/, '3', 'Ⅲ유형(초·중·고 교장·교감)'],
     [/(초등|중|고등)\s*학교[^\n]{0,25}(교사|선생님)|초\s*[·ㆍ]?\s*중\s*[·ㆍ]?\s*고\s*교사/, '4', 'Ⅳ유형(초·중·고 교사)'],
     [/변호사|회계사|노무사|세무사|변리사/, '3', 'Ⅲ유형(전문자격사)'],
-    [/(타\s*)?대학교?[^\n]{0,20}(교수|강사|연구교수)/, '3', 'Ⅲ유형(타 대학 전임·비전임 교직원)'],
+    [/(타\s*)?대학교?[^\n]{0,20}(교수(?!자)|강사|연구교수)/, '3', 'Ⅲ유형(타 대학 전임·비전임 교직원)'],
   ];
   const hit = rules.find(([re]) => re.test(around));
   // 강의 시간: 특강 줄 바로 위 두 줄의 '60''·'60분' 또는 '15:05~16:05'
@@ -1182,7 +1194,7 @@ function extract(masked){
   const nos = l => l.replace(/\s+/g, '');
   // 표에서 '일시'·'일정' 칸 제목 다음 줄(4줄 안)에 날짜가 오는 경우
   const nextDate = re => { for (let i = 0; i < L.length; i++){ const k = nos(L[i]);
-    if (k.length <= 12 && re.test(k) && !DATE_RE.test(L[i])){ const d = L.slice(i + 1, i + 5).find(l => DATE_RE.test(l)); if (d) return d; } } return ''; };
+    if (k.length <= 12 && re.test(k) && !DATE_RE.test(L[i])){ const d = L.slice(i + 1, i + (/^일시$/.test(k) ? 14 : 5)).find(l => DATE_RE.test(l)); if (d) return d; } } return ''; };   // 일정표의 '일시' 열: 열 제목 수만큼 떨어진 첫 행 날짜
   const dl = L.find(l => DL_EVENT.test(nos(l)) && DATE_RE.test(l))
           || L.find(l => DL_KEY.test(nos(l)) && DATE_RE.test(l))
           || L.find(l => /일정[:：]/.test(nos(l)) && !/회신|제출|마감|신청/.test(l) && DATE_RE.test(l))   // '일정: 2026.9.28.(월) ~ 9.29.(화)', '진단일정: …'
@@ -1247,6 +1259,11 @@ function extract(masked){
   out.evals = parseEvals(L);
   // 강사료 행에 유형·시간이 없으면 일정표의 특강 줄에서 추정
   const lec = inferLecture(L);
+  // 본문에 지급 기준 유형을 직접 적은 경우('특별강의료 지급 기준 유형 Ⅲ(1시간 최대 30만원) 적용')
+  const gl = L.find(l => /특강|특별\s*강의료|강사료|강의료/.test(l) && /유형\s*(Ⅳ|Ⅲ|Ⅱ|Ⅰ|IV|III|II)(?![가-힣A-Za-z])|(Ⅳ|Ⅲ|Ⅱ|Ⅰ)\s*유형/.test(l));
+  const gm = gl && gl.match(/유형\s*(Ⅳ|Ⅲ|Ⅱ|Ⅰ|IV|III|II)|(Ⅳ|Ⅲ|Ⅱ|Ⅰ)\s*유형/);
+  if (gm){ const g = {'Ⅰ':'1','Ⅱ':'2','Ⅲ':'3','Ⅳ':'4','II':'2','III':'3','IV':'4'}[gm[1] || gm[2]];
+    out.rows.forEach(r => { if (r.type === 'lecture' && !r.grade){ r.grade = g; r.grade_reason = `본문의 지급 기준 문구(${(gm[1] || gm[2])}유형)로 보았습니다`; } }); }
   if (lec) out.rows.forEach(r => {
     if (r.type !== 'lecture') return;
     if (!r.grade && lec.grade){ r.grade = lec.grade; r.grade_reason = lec.reason; }
