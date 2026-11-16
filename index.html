@@ -530,7 +530,7 @@ function maskText(text, opt){
     // 표 안에서는 끝글자 제한을 풀고('김용식'), 학과·단과대·지원 분야 같은 칸만 제외. '김혜진H'처럼 동명이인 구분 글자도 함께 가림
     {
       const ls = t.split('\n');
-      const HEAD = /^\s*(성\s*명|이\s*름|담당\s*교수|지도\s*교수|담당자|책임자|교수명|학생명|대표자)\s*$/;
+      const HEAD = /^\s*(성\s*명|이\s*름|(멘토|멘티|강사|발표자|참석자|참여자|수상자|수혜자|학생)\s*(이\s*름|성\s*명|명)|담당\s*교수|지도\s*교수|담당자|책임자|교수명|학생명|대표자)\s*$/;
       // 표 칸의 항목명(상금·연구비·용역비·강의장·기장 등)은 이름이 아님
       const NOT = /(대학|학과|학부|과|부|없음|전공|지도|연구|지원|합계|소계|계|원|센터|팀|처|실|단|비|금|료|장|액|별)$/;
       const okCell = w => { const k = w.replace(/[A-Za-z]$/, '');
@@ -613,10 +613,10 @@ function parseGrade(s){
 }
 
 /* ───────── 예산내역·산출내역·세부내역 표 읽기 ───────── */
-const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|세부\s*예산|소요\s*예산|결산\s*(내역|금액|액)|집행\s*(내역|금액|액)|단가|수량|인원|횟수|비고(?:\(.*\))?|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|품목명|물품명|장비명|용도|모델명\(규격\)|규격\(모델\))$/i;
+const HEAD_WORDS = /^(연번|번호|순번|No\.?|구분|내용|항목|품목|세부\s*항목|산출\s*근거|산출\s*내역|세부\s*내역|세부\s*산출\s*내역|산출식|금액|금액\s*\(.*\)|예산액|예산\s*\(.*\)|세부\s*예산|소요\s*예산|결산\s*(내역|금액|액)|집행\s*(내역|금액|액)|단가|수량|인원|횟수|비고(?:\(.*\))?|사업\s*내용|\(?\s*사업\s*코드\s*\)?|계정목|계약\s*금액|계약\s*자|계약\s*업체|공사비|용역비|설계비|회\(.*\)|회수|팀|계|소계|합계|단위|내역|단가\s*\(.*\)|모델\s*명?|규격|품명|품목명|물품명|장비명|용도|모델명\(규격\)|규격\(모델\))$/i;
 // '구  분', '계 약 자', '비  고'처럼 글자 사이에 띄어쓰기가 있어도 열 제목으로 인식
 const HEAD_RE = {test:s => HEAD_WORDS.test(String(s).replace(/\s+/g, ''))};
-const AMT_COL = /^(금액|예산액|세부\s*예산|소요\s*예산|결산\s*(금액|액)|집행\s*(금액|액)|계약\s*금액|공사비|용역비|설계비|계$|소계$|합계$)/;   // '단가 | 수량 | 계' 표의 '계' 열도 금액 열
+const AMT_COL = /^(금액|예산액|예산\s*\(.*\)|세부\s*예산|소요\s*예산|결산\s*(금액|액)|집행\s*(금액|액)|계약\s*금액|공사비|용역비|설계비|계$|소계$|합계$)/;   // '단가 | 수량 | 계' 표의 '계' 열도 금액 열
 const CODE_RE = /^[A-Z]\d{2,}(-\d+)+$/;            // 사업코드 (예: A055-25-432599)
 const NO_DETAIL = '세부 산출내역 없음(소요예산 전체)';
 const PROJ_RE = /^\[[^\]]+\]\S*$/;                 // 예산 사업명 (예: [혁신]학습역량프로그램운영비)
@@ -787,7 +787,7 @@ function parseBudgetTable(text){
     if (t < 0) return {rows:[], sum:''};
     s = t + 1; fallback = true;
   }
-  const END = /예산\s*항목|사업비\s*구성|예산\s*전용|^\s*붙임|배정\s*(예산)?\s*액|배정\s*예산/;   // 예산항목 표(배정액·잔액)는 예산 행이 아님
+  const END = /예산\s*항목|사업비\s*구성|예산\s*전용|^\s*붙임(?![^\n]*(참조|참고)\s*\)?\s*$)|배정\s*(예산)?\s*액|배정\s*예산/;   // 예산항목 표(배정액·잔액)는 예산 행이 아님
   let e = raw.findIndex((l, i) => i >= s && END.test(l) && !HEAD_RE.test(l.trim()));
   if (e < 0) e = raw.length;
   if (fallback){
@@ -2224,9 +2224,21 @@ function runChecks(f){
   // 품목 합계가 소요예산과 같을 때만(증감 표 등을 잘못 읽은 행을 더하지 않게)
   const oneBuy = buyRows.length > 1 && rows.every(r => r.type === 'goods') && /구입|구매/.test(f.text || '')
     && buyRows.every(r => num(r.amount) > 0) && buyRows.reduce((t, r) => t + num(r.amount), 0) === total;
+  // 부서 자체 지급 기준(강사비·상담·지도비 등)에 따른 금액: '인건비 지급기준 참고'처럼 적혀 있어도 채용·근로계약이나
+  // 특강료 유형 판정이 아니라 지급 기준의 적절성만 확인하게 함 (사용자 지시 2026-11-16)
+  const STD_ATT = (f.attach || []).find(x => /지급\s*기준/.test(x));
+  const ownStd = r => ['lecture', 'labor', 'payment', 'advice'].includes(r.type)
+    && /지급\s*기준/.test(r.content + ' ' + r.basis + ' ' + (r.note || ''))
+    && !/예산\s*집행\s*지침|특별\s*강의료|교외\s*전문가/.test(r.content + ' ' + r.basis + ' ' + (r.note || ''));
+  // 프로그램·행사 운영 기안의 준비물·재료·운영 물품은 계약으로 보지 않음. 수의계약 한도(부가세 포함 1,100만 원)를 넘을 때만 계약 판정 (사용자 지시 2026-11-16)
+  const progDoc = rows.some(r => r.type !== 'goods') && !/구입|구매|도입|교체/.test(f.name || '');
   rows.forEach(r => {
     const a = num(r.amount), u = num(r.unit), q = num(r.qty);
     const label = r.content || TYPE_LABEL[r.type];
+    if (ownStd(r)){
+      add('info', `${label} 지급 기준`, `부서 자체 지급 기준${STD_ATT ? `(붙임 「${STD_ATT}」)` : ''}에 따라 책정한 금액으로 보입니다. 지급 기준(단가·시간·대상)이 적절한지 확인하세요`);
+      return;
+    }
     if (r.type === 'meal'){
       const s = r.content + ' ' + r.basis;
       const hasSnack = /다과|간식|음료/.test(s), hasMeal = /식대|식사|오찬|만찬|도시락/.test(s);
@@ -2327,7 +2339,7 @@ function runChecks(f){
         if ((f.vat ? a : a * 1.1) > 1.1e7) procure(a, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
       }
     }
-    if (r.type === 'goods' && !isNaN(a) && !oneBuy && !/활동\s*지원/.test(r.content)) procure(a, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
+    if (r.type === 'goods' && !isNaN(a) && !oneBuy && !/활동\s*지원/.test(r.content) && !(progDoc && (f.vat ? a : a * 1.1) <= 1.1e7)) procure(a, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
     if (r.type === 'construction' && !isNaN(a)) procure(a, 'construction', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
     if (r.type === 'service' && !isNaN(a)) procure(a, 'service', f.vat, sole).forEach(p => add(lvC(p[0]), `${label} 계약`, msgC(p[0], p[1]), p[2]));
     if (r.type === 'lecture' && !(/원고료/.test(r.content) && !/특강|강사|강연|강의료/.test(r.content))){
@@ -2750,7 +2762,7 @@ function runChecks(f){
   if (ATT[bimok] && (bimok !== 'env' || isWork))
     add('info', '결과보고 첨부(비목별)', `비목이 ${BIMOK_LABEL[bimok]}${bimok === 'env' ? '이고 공사(시설개선) 건' : ''}이므로 결과보고 때 ${ATT[bimok]}를 첨부합니다`, G + '25쪽');
   // 인건비: 고용기간이 사업기간 안인지 (표에서 '2026. 11. 9.(월) ~' 다음 줄에 끝날이 와도 읽음) (사용자 지시 2026-11-05)
-  if (rows.some(r => r.type === 'labor') && f.from && f.to){
+  if (rows.some(r => r.type === 'labor' && !ownStd(r)) && f.from && f.to){
     const kw = T.search(/(고용|근로|근무|채용)\s*기간/);
     if (kw >= 0){
       const iso = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -2787,7 +2799,7 @@ function runChecks(f){
     add('info', '첨부 비밀번호', '본문에 첨부파일 비밀번호가 적혀 있어 마스킹했습니다. 개인정보가 담긴 파일의 비밀번호는 본문 대신 별도 경로로 전달하는 것을 권장합니다', '개인정보 보호 권고');
   // 기안문 작성이 아니라 프로그램 실시 후 집행·정산 때 참고할 안내는 '예산 집행 시 주의사항'으로 분리 (사용자 지시 2026-11-05)
   const EXEC_ITEM = /( 수령 확인| 준비 사항| 식대 포함| 지급대장| 결과보고| 증빙| 지급 전 확인| 학생 활동 지원| 기념품 제작| 기구 구입| 근로성| 견적| 기준)$|^(현수막·배너|설문 개인정보|결과보고 첨부\(비목별\)|검수|대금 지급|기자재 관리|주말 행사)$/;
-  R_.forEach(r => { if (r.lv === 'info' && EXEC_ITEM.test(r.item) && !/(발표자|계약·지급) 기준$/.test(r.item)){ r.lv = 'exec'; r.cat = 'exec'; } });
+  R_.forEach(r => { if (r.lv === 'info' && EXEC_ITEM.test(r.item) && !/(발표자|계약·지급|지급) 기준$/.test(r.item)){ r.lv = 'exec'; r.cat = 'exec'; } });
   // 계약·입찰·구매는 혁신지원팀 소관이 아니므로 참고 내용 끝에 문의처를 붙임 (사용자 지시 2026-11-05)
   // 계약·수의계약 → 예산조정팀 / 입찰·구매 → 예산조정팀(글로벌캠퍼스는 총괄지원팀). 항목마다 첫 줄에 한 번만
   const PROC_ITEM = /( 계약|계약방법|^계약서|계약서 생략|비교견적|복수견적| 견적|선정 업체|최저가 선정|구매업체|평가 방식)$/;
