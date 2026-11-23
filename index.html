@@ -920,6 +920,14 @@ function parseBudgetTable(text){
         if (!/^[-–·•※*]\s*\S|^\d[\d,.]*\s*(만\s*)?원?\s*[×xX*]\s*\d/.test(nx)) break;
         extra.push(nx); k++;
       }
+      // '항목 | 금액 | 비고' 표(이름 칸 바로 뒤 금액)에서 비고 칸이 여러 줄·긴 글이면 다음 금액 바로 앞 줄(다음 행 이름) 전까지 모두 이 행에 붙임
+      if (amtPos === 1 && trailCols.length && !hasIdx) while (k + 1 < body.length){
+        const nx = body[k + 1];
+        if (!nx){ k++; continue; }
+        if (AMT_RE.test(nx) || TOTAL_RE.test(nx.replace(/\s+/g, '')) || SUBTOTAL_RE.test(nx) || CODE_RE.test(nx) || /^※/.test(nx)) break;   // ※ 표 아래 주석은 행에 붙이지 않음
+        if (AMT_RE.test(nextTok(k + 1)) && money(nextTok(k + 1)) >= 100) break;   // 다음 행 이름
+        extra.push(nx); k++;
+      }
       // '구분 | 항목 | 내역 | 금액' 표에서 여러 행을 묶은 구분 칸('중간 워크숍', '수료식')이 행 앞에 붙으면 떼어 내고 항목을 내용으로
       const bPos = hc.findIndex(h => /^(내역|산출|세부\s*내역)/.test(h));
       const gN = cur.length - amtPos + 1;
@@ -1170,7 +1178,8 @@ function extract(masked){
 
   const nm = all.match(/행\s*사\s*(?:내\s*용|명)\s*[:：]\s*(.+)/) || all.match(/사\s*업\s*명\s*[:：]\s*(.+)/) || all.match(/과\s*업\s*명\s*[:：]\s*(.+)/)
           || all.match(/장\s*학\s*금\s*명\s*[:：]\s*(.+)/) || all.match(/프\s*로\s*그\s*램\s*명\s*[:：]\s*(.+)/)
-          || all.match(/공\s*사\s*명\s*[:：]\s*(.+)/) || all.match(/용\s*역\s*명\s*[:：]\s*(.+)/);
+          || all.match(/공\s*사\s*명\s*[:：]\s*(.+)/) || all.match(/용\s*역\s*명\s*[:：]\s*(.+)/)
+          || all.match(/(?:조\s*사|대\s*회|과\s*정)\s*명\s*[:：]\s*(.+)/);   // 2026-11-19 교육만족도 조사 기안 '조사명:'
   if (nm) out.name = nm[1].trim();
   else {
     // '사업명:' 줄이 없으면 본문 문장에서: '~를 위해 ○○를 진행하고자', '이와 관련하여 ○○를 시행하고자'
@@ -1897,6 +1906,15 @@ function parseCompose(L){
       if (hasArea && cmpAreaOf(c[0]) && c[0].length <= 12){ area = c[0]; j = 1; }
       else if (hasArea && !first) break;
       const mid = c.slice(j, bi);
+      // 머리줄의 과제 칸 수보다 줄이 많고, 앞 줄이 '~을 위한'처럼 말이 끝나지 않았으며 다음 줄이 번호로 시작하지 않으면
+      // 칸 안 글자가 두 줄로 나뉜 것('교육혁신전략 추진을 위한' + '학내 지원 체계 혁신') → 이어 붙임
+      // (번호 붙은 3단 표 '2. …' / '4. …' / '4.2. …'는 머리줄이 2칸이어도 그대로 둠)
+      const taskCols = i - s - (hasArea ? 1 : 0);
+      while (taskCols >= 1 && mid.length > taskCols){
+        const at = mid.findIndex((x, q) => q < mid.length - 1 && /(위한|위해|통한|대한|관한|및|의|와|과|을|를|에|,|·)$/.test(x.trim()) && !/^\(?\s*\d/.test(mid[q + 1].trim()));
+        if (at < 0) break;
+        mid.splice(at, 2, (mid[at] + ' ' + mid[at + 1]).replace(/\s+/g, ' '));
+      }
       const [S, K, E] = mid.length >= 3 ? mid.slice(-3) : [mid[0] || '', mid[1] || '', ''];
       rows.push({area, s:S, k:K, e:E, b:c[bi]});
       k += bi + 1;
@@ -2055,7 +2073,7 @@ function runChecks(f){
     else add('ok', '일자·요일', `${f.date}(${real})${dEndTxt}`);
     if (f.from && f.to && f.date >= f.from && f.date <= f.to && (dEnd || f.date) > f.to && fyPay) add('ok', '사업기간', `기간이 ${dEnd}까지이지만 ${FY_OK}`, G + '15쪽');
     else if (f.from && f.to && (f.date < f.from || (dEnd || f.date) > f.to)) add('err', '사업기간', `행사${dEnd ? ' 기간' : '일'}(${f.date}${dEndTxt})이 사업기간(${f.from}~${f.to}) 밖입니다. 계약기간·대금 지급도 사업기간 안이어야 합니다`, G + '15쪽');
-    else add('ok', '사업기간', `행사${dEnd ? ' 기간' : '일'}이 사업기간 안입니다`, G + '15쪽');
+    else add('ok', '사업기간', `${/조\s*사\s*(기\s*간|시\s*기)\s*[:：]/.test(f.text || '') && !/일\s*시\s*[:：]/.test(f.text || '') ? '조사' : '행사'}${dEnd ? ' 기간' : '일'}이 사업기간 안입니다`, G + '15쪽');
     if (dt.getDay() === 0 || dt.getDay() === 6) add('info', '주말 행사', '주말 행사입니다. 식대·회의비를 집행하면 사유를 남겨 두세요', G + '74쪽');
   } else if ((() => {
       // '일시: 2026학년도 10월 말 ~ 2027년 1월 초'처럼 월 단위 기간이면 끝나는 달만 사업기간과 비교
@@ -2270,8 +2288,15 @@ function runChecks(f){
     }
     if (r.type === 'voucher'){
       if (isNaN(q)) add('err', `${label} 인원수`, '지급 인원수를 명시하세요 (예: 10,000원 × 30명)', G + '37쪽');
-      else add('ok', `${label} 인원수`, `${q}명`);
+      else {
+        // 단가가 안 적혀 있으면 금액÷인원으로 1인당 금액을 보여 주고 단가 기재 권고 (2026-11-19)
+        const amt = num(r.amount), per = amt && q ? amt / q : 0;
+        const noUnit = !num(r.unit) && !/\d[\d,]*\s*원\s*(권|짜리)?\s*[×xX*]/.test(r.basis || '');
+        add('ok', `${label} 인원수`, `${q}명${noUnit && per && Number.isInteger(per) ? ` (1인당 ${fmt(per)}원으로 계산됩니다. 기안문에 1인당 단가를 적어 두세요)` : ''}`);
+      }
       add('info', `${label} 사전 승인`, '상품권·기프티콘은 사업 목적 달성을 위한 인센티브 성격일 때만 지급할 수 있습니다. 품목·단가·지급 인원을 기안문에 적어 사전 승인을 받고, 학생에게 지급하세요(교직원·외부인 지급 지양)', BX + '25쪽');
+      const extWho = ((r.content + ' ' + r.basis).match(/학부모|동문|졸업생|산업계|기업|외부인|일반인|지역\s*주민|시민/g) || []);
+      if (extWho.length) add('info', `${label} 외부인 지급`, `지급 대상에 외부인(${[...new Set(extWho)].join('·')})이 들어 있습니다. 유가증권은 외부인 지급을 지양하므로 외부인에게 주어야 하는 사유(설문 응답 사례 등)를 기안문에 적고, 지급대장은 외부인 서식 [서식4-2]로 작성하세요`, BX + '25쪽 / ' + G + '52~53쪽');
       add('info', `${label} 지급대장`, '유가증권(상품권·기프티콘 등)을 지급할 때는 집행지침 52~53쪽의 지급대장(유가증권용)을 반드시 작성하세요. ▸ 내부구성원(학생·교직원): [서식4-1] 소속, 학번/사번, 성명 등 명단을 작성하세요 ▸ 외부인: [서식4-2] 소속, 직위, 성명, 주민번호, 주소, 금액, 수령일자, 서명', G + '37~38쪽, 52~53쪽');
       if (/전원|모든\s*참여자|참가자\s*전체/.test(allText)) add('warn', `${label} 지급 조건`, '참여자 전원 일괄 지급처럼 보입니다. 단순 참여 대가성 지급은 불가하니 지급 조건(수상, 수료 등)을 적으세요', G + '38쪽, 79쪽');
       else if (/선정|추첨|선발|우수|수상|입상/.test(r.basis + ' ' + r.content))
@@ -2430,6 +2455,7 @@ function runChecks(f){
         && !/심사|평가|특강|강의|강연|강사|발표|자문|멘토|원고|지도|통역|번역|출제|채점|감독|면접/.test(allowText)           // 교내 심사·특강 등 참여
         && !/학생|단원|활동|서포터즈|수강생|재학생|기장|장학/.test(allowText)                                                // 학생 활동
         && !/외부|교외|초빙/.test(allowText)                                                                                  // 외부 인사
+        && !/응답자|참여자|참가자|학부모|동문|산업계/.test(allowText)                                                          // 설문 응답자 등 (2026-11-19)
         && !/(보조|진행|운영)\s*(인력|요원|인원|스태프)|행사\s*(인력|요원|스태프|보조)|아르바이트/.test(allowText))          // 행사 보조 인력
       allowKind = /교직원|직원|교원|교수|보직|담당자|팀장|처장|원장|센터장/.test(allowText) ? 'staff' : 'unknown';
     if (allowKind === 'staff')
