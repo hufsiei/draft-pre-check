@@ -822,6 +822,10 @@ function parseBudgetTable(text){
   const hasUse = trailCols.some(h => /^용도/.test(h));   // 금액 뒤 '용도' 칸: 값이 늘 있으므로 그 행에 붙임
 
   const rows = []; let sum = '', lastGroup = '';
+  // '구분 | 산출내역 | 금액 | 비고' 표(산출근거 칸이 이름과 금액 사이): 구분 칸이 병합되면 다음 행은 식부터 시작함 (2026-11-25 마라톤 기안)
+  const midBasis = (() => { const b = hc.findIndex(h => /^(산출|세부\s*내역|내역)/.test(h)); return b > 0 && b < amtPos; })();
+  const EXPR = /^\d[\d,.]*\s*(만\s*)?원권?\s*[×xX*]\s*\d/;
+  const shape = s => (s || '').replace(/[\d,.\s]/g, '');
   // '1.408,000'·'190.000원'처럼 쉼표 자리에 마침표를 쓴 금액 칸은 쉼표로 바꿔 읽음(표기 오류는 runChecks '금액 표기'에서 안내)
   const body = tok.slice(i).map(t => /^\d{1,3}([.,]\d{3}){2,}\s*원?$|^\d{1,3}\.\d{3}\s*원$/.test(t) && t.includes('.') ? t.replace(/\./g, ',') : t);
 
@@ -918,6 +922,7 @@ function parseBudgetTable(text){
       if (ok && money(nextTok(k)) < sub){ if (cur.length > 1) cur = [cur[cur.length - 1]]; continue; }
     }
     if (isAmt && cur.length){
+      if (midBasis && EXPR.test(cur[0]) && rows.length) cur = [rows[rows.length - 1].content, ...cur];   // 병합된 구분 칸: 앞 행 이름
       let note = ''; const extra = [];
       // 금액 열 뒤의 칸 읽기: 계약자·업체 같은 열은 자리대로, 비고는 짧은 메모일 때만
       for (const col of trailCols){
@@ -925,7 +930,15 @@ function parseBudgetTable(text){
         const nx = body[k + 1];
         if (TOTAL_RE.test(nx.replace(/\s+/g, '')) || (nx && AMT_RE.test(nx))) break;
         if (/^비고/.test(col)){
-          if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx))){ note = nx; k++; }
+          // 비고인지 다음 행 이름인지: 뒤에 '이름 → 식'이 오거나, 바로 뒤 식이 이 행 식과 같은 꼴(병합 칸의 다음 행)이면 비고
+          let noteAhead = false;
+          if (midBasis && nx && !EXPR.test(nx) && !AMT_RE.test(nx)){
+            let q1 = k + 2; while (q1 < body.length && !body[q1]) q1++;
+            const a1 = body[q1] || '', a2 = nextTok(q1);
+            noteAhead = (a1 && !EXPR.test(a1) && !AMT_RE.test(a1) && !TOTAL_RE.test(a1.replace(/\s+/g, '')) && !SUBTOTAL_RE.test(a1) && EXPR.test(a2))
+              || (EXPR.test(a1) && cur.length > 1 && EXPR.test(cur[cur.length - 1]) && shape(a1) === shape(cur[cur.length - 1]));
+          }
+          if (!nx){ k++; } else if (NOTE_LIKE.test(nx) || (nx.length <= 6 && !AMT_RE.test(nx)) || noteAhead){ note = nx; k++; }
         } else { if (nx) extra.push(/^(산출|세부|내역)/.test(col) ? nx : `${col} ${nx}`); k++; }   // 산출근거 칸은 열 이름 없이
       }
       // 산출근거·비고 칸이 여러 줄('- …', '※ …', 식)이면 다음 행 이름으로 넘기지 않고 이어서 붙임
@@ -2999,7 +3012,8 @@ function mergeSameItems(arr){
     if (parts.length < 2) return r;
     const lv = parts.reduce((a, p) => RANK[p.lv] > RANK[a] ? p.lv : a, parts[0].lv);
     const bases = [...new Set(parts.flatMap(p => String(p.basis || '').split(' / ')).map(x => x.trim()).filter(Boolean))];
-    return {...r, lv, msg:parts.map((p, i) => `${i + 1}. ${p.msg}`).join(' ¶ '), basis:bases.join(' / ')};
+    const msgs = [...new Set(parts.map(p => p.msg))];   // 같은 문구는 한 번만(병합 칸으로 같은 이름 행이 여럿일 때)
+    return {...r, lv, msg:msgs.length === 1 ? msgs[0] : msgs.map((m, i) => `${i + 1}. ${m}`).join(' ¶ '), basis:bases.join(' / ')};
   });
 }
 
