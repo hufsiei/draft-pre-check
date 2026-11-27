@@ -646,7 +646,21 @@ function parseExprs(s){
   s = s.replace(/(\d원?)(\s*\([^()\d]{1,15}\))(?=\s*[×*xX✕])/g, (m, a, b) => a + ' '.repeat(b.length));
   const out = [], re = /(\d[\d,]*)\s*원?\s*((?:[×*xX✕]\s*\d[\d,.]*\s*[가-힣]{0,2}\s*)+)(?:=\s*([\d,]+)\s*원?)?/g;
   let m;
+  // 괄호로 묶은 덧셈 식 × 수량: '(200,000 + 150,000 × 4시간) × 4일' → (200,000 + 600,000) × 4 (곱셈 먼저) (2026-11-27 HUFSpeech 기안)
+  const re0 = /\(\s*([^()]*\d[^()]*\+[^()]*\d[^()]*)\)\s*((?:[×*xX✕]\s*\d[\d,.]*\s*[가-힣]{0,2}\s*)+)(?:=\s*([\d,]+)\s*원?)?/g;
+  while ((m = re0.exec(s))){
+    if (/[^\d,.\s원+×*xX✕가-힣]/.test(m[1])) continue;
+    const terms = m[1].split('+').map(t => t.split(/[×*xX✕]/).map(x => num((x.match(/(?<![가-힣\d])\d[\d,.]*/) || [''])[0])));   // '제1저자'의 1은 건너뜀
+    if (terms.some(t => !t.length || t.some(isNaN))) continue;
+    const inner = terms.reduce((a, t) => a + t.reduce((p, q) => p * q, 1), 0);
+    const factors = m[2].split(/[×*xX✕]/).map(t => t.trim()).filter(Boolean);
+    const nums = factors.map(t => num(t.replace(/[가-힣]+$/, '')));
+    if (nums.some(isNaN)) continue;
+    out.push({unit:inner, factors, nums, product:nums.reduce((a, b) => a * b, inner), stated:m[3] ? num(m[3]) : NaN, at:m.index, end:m.index + m[0].length, grouped:true,
+              terms:terms.map(t => t.reduce((p, q) => p * q, 1))});
+  }
   while ((m = re.exec(s))){
+    if (out.some(o => m.index < o.end && o.at < m.index + m[0].length)) continue;
     const factors = m[2].split(/[×*xX✕]/).map(t => t.trim()).filter(Boolean);
     const nums = factors.map(t => num(t.replace(/[가-힣]+$/, '')));
     if (nums.some(isNaN)) continue;
@@ -1995,7 +2009,11 @@ function cmpReadWrapped(L, k, hasArea){
   const isNew = x => !x || /^\(?\s*\d+(\.\d+)*\s*[.)]/.test(x) || cmpBimokNo(x) || /^([가-하]|\d{1,2})[.)]?\s/.test(x) || /예산|붙\s*임/.test(x);
   while (p < L.length && mid.length <= 3){
     let cell = L[p++];
-    const nx = L[p] || '';
+    const nx = L[p] || '', nx2 = L[p + 1] || '';
+    // 비목: '교육연구' + '프로그램개발' + '운영비'처럼 세 줄로 나뉘면 붙임 (2026-11-27 학생상담센터 수기공모전 기안)
+    if (!cmpBimokNo(cell) && !cmpBimokNo(cell + nx) && nx2 && /^(\(?0\d\)?)?(교육연구|기타사업|그밖의)/.test(cmpNorm(cell)) && cmpNorm(cell).length <= 10 && /비$/.test(cmpNorm(nx2)) && cmpNorm(nx2).length <= 8 && cmpBimokNo(cell + nx + nx2)){
+      b = cell + ' ' + nx + ' ' + nx2; break;
+    }
     // 비목: '(01)교육연구프로그램' + '개발운영비'처럼 나뉘면 붙임
     if (cmpBimokNo(cell) || cmpBimokNo(cell + nx)){
       if (nx && /비$/.test(cmpNorm(nx)) && cmpNorm(nx).length <= 8 && cmpBimokNo(cell + nx)) { cell += ' ' + nx; p++; }
@@ -2260,6 +2278,9 @@ function runChecks(f){
         add('ok', `${r.content} 산출`, `산출근거의 식 합 ${won(total)} + 따로 적힌 금액 ${won(extra)} = ${won(a)}`);
       else if (!isNaN(a) && total !== a && /왕복/.test(r.basis) && total * 2 === a)
         add('ok', `${r.content} 산출`, `왕복 기준 ${won(total)} × 2 = ${won(a)}. 산출근거에 '× 2(왕복)'을 적어 두면 더 분명합니다`);
+      // 괄호 식인데 '※ 한 팀은 공동저자 부재로 1,500,000원 지급'처럼 조정 사유가 적혀 있으면 참고로 (2026-11-27)
+      else if (!isNaN(a) && total !== a && ex.some(e => e.grouped) && /※[^\n]*\d/.test(r.basis || ''))
+        add('info', `${r.content} 산출`, `산출근거 식은 ${won(total)}인데 금액은 ${won(a)}입니다. ※ 설명대로 조정한 금액인지 확인하세요`);
       else if (!isNaN(a) && total !== a)
         add('err', `${r.content} 산출`, ex.length === 1 ? `산출근거 ${won(ex[0].unit)} × ${ex[0].factors.join(' × ')} = ${won(total)}인데 금액은 ${won(a)}입니다`
                                                          : `산출근거의 식 ${ex.length}개 합은 ${won(total)}인데 금액은 ${won(a)}입니다`);
@@ -2342,9 +2363,15 @@ function runChecks(f){
     && !/예산\s*집행\s*지침|특별\s*강의료|교외\s*전문가/.test(r.content + ' ' + r.basis + ' ' + (r.note || ''));
   // 프로그램·행사 운영 기안의 준비물·재료·운영 물품은 계약으로 보지 않음. 수의계약 한도(부가세 포함 1,100만 원)를 넘을 때만 계약 판정 (사용자 지시 2026-11-16)
   const progDoc = rows.some(r => r.type !== 'goods') && !/구입|구매|도입|교체/.test(f.name || '');
+  // 시행 기안인데 세부 산출내역이 없으면(장학금·품목 표 있는 구매 제외) 계약·견적 판정을 하지 않고 세부내역 작성을 보완 요청 (사용자 지시 2026-11-27)
+  // 계약·구매·배분 건(제목·사업명에 공사·용역·구입·구매·도입·유지보수·설치·계약, 학과특성화 배분)은 견적서·내역서로 금액을 보므로 기존 계약 판정 유지
+  const ndTitle = ((f.text || '').match(/제\s*목\s*[:：]?\s*\n?\s*([^\n]+)/) || [])[1] || '';
+  const ndContract = /공사|용역|구입|구매|도입|유지\s*보수|설치|계약|입찰|학과\s*특성화/.test((f.name || '') + ' ' + ndTitle);
+  const noDetailPlan = r => !isReport && !ndContract && (r.basis || '').startsWith('세부 산출내역 없음') && !['scholarship', 'dept'].includes(r.type) && !(f.items || []).length;
   rows.forEach(r => {
     const a = num(r.amount), u = num(r.unit), q = num(r.qty);
     const label = r.content || TYPE_LABEL[r.type];
+    if (noDetailPlan(r)) return;
     if (ownStd(r)){
       add('info', `${label} 지급 기준`, `부서 자체 지급 기준${STD_ATT ? `(붙임 「${STD_ATT}」)` : ''}에 따라 책정한 금액으로 보입니다. 지급 기준(단가·시간·대상)이 적절한지 확인하세요`);
       return;
@@ -2494,7 +2521,7 @@ function runChecks(f){
       const lv = LEVELS.find(([re]) => re.test(T + ' ' + r.basis));
       const exP = parseExprs(r.basis);
       const manP = [...String(r.basis).matchAll(/([\d.]+)\s*만\s*원/g)].map(m => Number(m[1]) * 1e4);
-      const top = Math.max(0, ...exP.map(e => e.unit), ...manP);
+      const top = Math.max(0, ...exP.map(e => e.grouped ? Math.max(...e.terms) : e.unit), ...(exP.some(e => e.grouped) ? [] : manP));   // 괄호 식은 항목별 최고액(제1저자 100만)
       const team = /팀/.test(r.basis + r.content);
       if (top && lv){
         if (top <= lv[1]) add('ok', `${label} 한도`, `최고 상금 ${won(top)}${team ? '(팀)' : ''} ≤ ${lv[2]} 1등 1인 최대 ${won(lv[1])}`, G + '37쪽');
@@ -2669,7 +2696,9 @@ function runChecks(f){
     procure(tot, 'goods', f.vat, sole).forEach(p => add(lvC(p[0]), `물품 ${buyRows.length}종 합계(${won(tot)}) 계약`, msgC(p[0], p[1]), p[2]));
   }
 
-  if (rows.some(r => (r.basis || '').startsWith(NO_DETAIL) && r.type !== 'scholarship'))
+  const ndp = rows.find(noDetailPlan);
+  if (ndp) add('warn', '산출내역', `세부 산출내역이 없습니다. 소요예산 금액(${won(num(ndp.amount))})의 세부내역(항목별 단가 × 수량 = 금액)을 작성하세요`);
+  else if (rows.some(r => (r.basis || '').startsWith(NO_DETAIL) && r.type !== 'scholarship'))
     add('info', '산출내역', `세부 산출내역 표가 없어 소요예산(구매·계약금액) 전체를 한 항목으로 점검했습니다. 견적서(붙임)로 ${(f.items || []).length > 1 ? '품목별 ' : ''}금액 근거를 확인하세요`);
 
   // 예산 줄이 여러 개인 경우: 줄마다 잔액 계산
